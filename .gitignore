@@ -1,0 +1,10 @@
+# PlatformIO stuff
+.pio
+.pioenvs
+.piolibdeps
+
+# VSCode stuff
+.vscode
+
+# Disassembly output
+disassembly.txt

@@ -1,0 +1,2 @@
+Switch CyGarage "Garage Door" <""> {http=">[ON:POST:http://YOUR_HOSTNAME/device/activate]", autoupdate="false"}
+String CyGarageDoorStatus "Current position [%s]" <garagedoor> {http="<http://YOUR_HOSTNAME/device/status:2000:REGEX((.*?))]"}
