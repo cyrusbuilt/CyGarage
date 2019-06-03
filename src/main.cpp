@@ -1,3 +1,6 @@
+#ifndef ESP8266
+    #error This firmware is only compatible with ESP8266 controllers.
+#endif
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -7,6 +10,7 @@
 #include "Relay.h"
 #include "TaskScheduler.h"
 #include "ResetManager.h"
+#include "ESPCrashMonitor.h"
 
 #define FIRMWARE_VERSION "1.0"
 
@@ -43,6 +47,7 @@ void onCheckActivation();
 void onCheckSensors();
 void failSafe();
 
+
 // Global vars
 MDNSResponder mdns;
 ESP8266WebServer server(WEBSERVER_PORT);
@@ -60,6 +65,7 @@ String password = DEFAULT_PASSWORD;
  * Scan for available networks and dump each discovered network to the console.
  */
 void getAvailableNetworks() {
+    ESPCrashMonitor.defer();
     Serial.println(F("INFO: Scanning WiFi networks..."));
     int numNetworks = WiFi.scanNetworks();
     for (int i = 0; i < numNetworks; i++) {
@@ -345,6 +351,7 @@ void checkCommand() {
  * and propmpt the user for configuration.
  */
 void failSafe() {
+    ESPCrashMonitor.defer();
     Serial.println();
     Serial.println(F("ERROR: Entering failsafe (config) mode..."));
     taskMan.disableAll();
@@ -533,11 +540,20 @@ void onRelayStateChange(RelayInfo* sender) {
     // TODO Currently nothing to do here yet. May not need this.
 }
 
+void initCrashMonitor() {
+    Serial.print(F("INIT: Initializing crash monitor... "));
+    ESPCrashMonitor.disableWatchdog();
+    Serial.println(F("DONE"));
+    ESPCrashMonitor.dump(Serial);
+    delay(100);
+}
+
 /**
  * Bootstrap routine. Executes once at boot and initializes all subsystems in sequence.
  */
 void setup() {
     initSerial();
+    initCrashMonitor();
     initOutputs();
     initInputs();
     initWiFi();
@@ -546,6 +562,7 @@ void setup() {
     initOTA();
     initTaskManager();
     Serial.println(F("INIT: Boot sequence complete."));
+    ESPCrashMonitor.enableWatchdog(ESPCrashMonitorClass::ETimeout::Timeout_2s);
 }
 
 /**
@@ -553,6 +570,7 @@ void setup() {
  * and OTA update requests.
  */
 void loop() {
+    ESPCrashMonitor.iAmAlive();
     taskMan.execute();
     server.handleClient();
     ArduinoOTA.handle();

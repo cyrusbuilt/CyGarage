@@ -8,3 +8,8 @@
 
 # Disassembly output
 disassembly.txt
+
+# These are currently empty, so we don't need them.
+include/
+lib/
+test/
