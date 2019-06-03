@@ -10,7 +10,7 @@
 #include "Relay.h"
 #include "TaskScheduler.h"
 #include "ResetManager.h"
-#include "ESPCrashMonitor.h"
+#include "ESPCrashMonitor-master/ESPCrashMonitor.h"
 
 #define FIRMWARE_VERSION "1.0"
 
