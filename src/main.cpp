@@ -11,6 +11,9 @@
 #include "TaskScheduler.h"
 #include "ResetManager.h"
 #include "ESPCrashMonitor-master/ESPCrashMonitor.h"
+extern "C" {
+  #include "user_interface.h"
+}
 
 #define FIRMWARE_VERSION "1.0"
 
@@ -21,7 +24,7 @@
 #define WEBSERVER_PORT 80                       // The built-in webserver port.
 #define SERIAL_BAUD 115200                      // The BAUD rate (speed) of the serial port (console).
 #define CHECK_WIFI_INTERVAL 30000               // How often to check WiFi status (milliseconds).
-#define CHECK_SENSORS_INTERVAL 1000             // How often to check sensors (milliseconds).
+#define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
 #define ACTIVATION_DURATION 500                 // How long the activation relay should be on.
 #define DEVICE_NAME "CyGarage"                  // The device name.
 #ifdef ENABLE_OTA
@@ -60,6 +63,42 @@ Task tCheckSensors(CHECK_SENSORS_INTERVAL, TASK_FOREVER, &onCheckSensors);
 Scheduler taskMan;
 String ssid = DEFAULT_SSID;
 String password = DEFAULT_PASSWORD;
+bool isDHCP = false;
+
+void waitForUserInput() {
+    while (Serial.available() < 1) {
+        ESPCrashMonitor.iAmAlive();
+        delay(50);
+    }
+}
+
+String getInputString() {
+    char c;
+    String result = "";
+    bool gotEndMarker = false;
+    while (!gotEndMarker) {
+        ESPCrashMonitor.iAmAlive();
+        if (Serial.available() > 0) {
+            c = Serial.read();
+            if (c == '\n') {
+                gotEndMarker = true;
+                break;
+            }
+
+            result += c;
+        }
+    }
+
+    return result;
+}
+
+void printNetworkInfo() {
+    Serial.print(F("INFO: Local IP: "));
+    Serial.println(WiFi.localIP());
+    Serial.print(F("INFO: MAC address: "));
+    Serial.println(WiFi.macAddress());
+    WiFi.printDiag(Serial);
+}
 
 /**
  * Scan for available networks and dump each discovered network to the console.
@@ -147,11 +186,12 @@ void activateDoor() {
  * Initializes the MDNS responder.
  */
 void initMDNS() {
-    Serial.print(F("INIT: Starting MDNS responder"));
+    Serial.print(F("INIT: Starting MDNS responder... "));
     if (WiFi.status() == WL_CONNECTED) {
-        while (!mdns.begin(DEVICE_NAME)) {
-            delay(1000);
-            Serial.print(F("."));
+        ESPCrashMonitor.defer();
+        delay(500);
+        if (!mdns.begin(DEVICE_NAME)) {
+            Serial.println(F(" FAILED"));
         }
 
         Serial.println(F(" DONE"));
@@ -193,13 +233,13 @@ void promptConfig() {
     Serial.println(F("= s: Scan wireless networks  ="));
     Serial.println(F("= n: Connect to new network  ="));
     Serial.println(F("= w: Reconnect to WiFi       ="));
+    Serial.println(F("= e: Resume normal operation ="));
+    Serial.println(F("= g: Get network info        ="));
     Serial.println(F("=                            ="));
     Serial.println(F("=============================="));
     Serial.println();
-    Serial.println("Enter command choice (r/c/s/w): ");
-    while (Serial.available() < 1) {
-        delay(50);
-    }
+    Serial.println("Enter command choice (r/c/s/n/w/e/g): ");
+    waitForUserInput();
 }
 
 /**
@@ -228,12 +268,26 @@ void resumeNormal() {
  * Attempt to connect to 
  */
 void connectWifi() {
-    WiFi.setAutoReconnect(true);
+    Serial.println(F("DEBUG: Disconnect and clear to prevent auto connect..."));
+    WiFi.persistent(false);
+    WiFi.disconnect(true);
+    ESPCrashMonitor.defer();
+    delay(1000);
+    Serial.println(F("DEBUG: Setting mode..."));
+    WiFi.mode(WIFI_STA);
+    //WiFi.setAutoReconnect(true);
+    Serial.println(F("DEBUG: Beginning connection..."));
     WiFi.begin(ssid, password);
+    // if (isDHCP) {
+    //     Serial.println(F("DEBUG: Forcing DHCP ..."));
+    //     (void)wifi_station_dhcpc_start();
+    // }
     
-    int maxTries = 3;
+    Serial.println(F("DEBUG: Waiting for connection..."));
+    const int maxTries = 20;
     int currentTry = 0;
     while ((WiFi.status() != WL_CONNECTED) && (currentTry < maxTries)) {
+        ESPCrashMonitor.iAmAlive();
         currentTry++;
         wifiLED.blink(500);
         delay(500);
@@ -244,11 +298,7 @@ void connectWifi() {
         failSafe();
     }
     else {
-        Serial.println(F("INFO: WiFi connected."));
-        Serial.print(F("INFO: Local IP address: "));
-        Serial.println(WiFi.localIP());
-        Serial.print(F("INFO: MAC address: "));
-        Serial.println(WiFi.macAddress());
+        printNetworkInfo();
     }
 }
 
@@ -257,6 +307,7 @@ void connectWifi() {
  * the specified action if valid.
  */
 void checkCommand() {
+    IPAddress addr(0, 0, 0, 0);
     String str = "";
     char incomingByte = Serial.read();
     switch (incomingByte) {
@@ -272,39 +323,33 @@ void checkCommand() {
             break;
         case 'c':
             // Change network mode.
-            Serial.println(F("Choose network mode (d = DHCP, t = Static"));
-            while (Serial.available() < 1) {
-                delay(50);
-            }
+            Serial.println(F("Choose network mode (d = DHCP, t = Static):"));
+            waitForUserInput();
             checkCommand();
             break;
         case 'd':
             // Switch to DHCP mode.
             ESP.eraseConfig();
-            WiFi.mode(WIFI_STA);
+            isDHCP = true;
+            Serial.println(F("INFO: Set DHCP mode."));
             promptConfig();
             checkCommand();
             break;
         case 't':
             // Switch to static IP mode. Request IP settings.
             ESP.eraseConfig();
+            isDHCP = false;
             Serial.println(F("Enter IP address: "));
-            while (Serial.available() < 1) {
-                delay(50);
-            }
-            str = Serial.readString();
+            waitForUserInput();
+            str = Serial.readStringUntil('\n');
             ip = getIPFromString(str);
             Serial.println(F("Enter gateway: "));
-            while (Serial.available() < 1) {
-                delay(50);
-            }
-            str = Serial.readString();
+            waitForUserInput();
+            str = getInputString();
             gw = getIPFromString(str);
             Serial.println(F("Enter subnet mask: "));
-            while (Serial.available() < 1) {
-                delay(50);
-            }
-            str = Serial.readString();
+            waitForUserInput();
+            str = getInputString();
             sm = getIPFromString(str);
             WiFi.config(ip, gw, sm);
             promptConfig();
@@ -314,6 +359,7 @@ void checkCommand() {
             // Attempt to reconnect to WiFi.
             onCheckWiFi();
             if (WiFi.status() == WL_CONNECTED) {
+                printNetworkInfo();
                 resumeNormal();
             }
             else {
@@ -324,18 +370,24 @@ void checkCommand() {
             break;
         case 'n':
             Serial.println(F("Enter new SSID: "));
-            while (Serial.available() < 1) {
-                delay(50);
-            }
-
-            ssid = Serial.readString();
+            waitForUserInput();
+            ssid = getInputString();
+            Serial.print(F("SSID = "));
+            Serial.println(ssid);
             Serial.println(F("Enter new password: "));
-            while(Serial.available() < 1) {
-                delay(50);
-            }
-
-            password = Serial.readString();
+            waitForUserInput();
+            password = getInputString();
+            Serial.print(F("Password = "));
+            Serial.println(password);
             connectWifi();
+            break;
+        case 'e':
+            resumeNormal();
+            break;
+        case 'g':
+            printNetworkInfo();
+            promptConfig();
+            checkCommand();
             break;
         default:
             // Specified command is invalid.
@@ -362,6 +414,12 @@ void failSafe() {
     checkCommand();
 }
 
+void checkInterrupt() {
+    if (Serial.available() > 0 && Serial.read() == 'i') {
+        failSafe();
+    }
+}
+
 /**
  * Initializes the WiFi network interface.
  */
@@ -373,7 +431,8 @@ void initWiFi() {
     Serial.print(DEFAULT_SSID);
     Serial.println(F("..."));
     
-    WiFi.config(ip, gw, sm);
+    //WiFi.mode(WIFI_STA);
+    //WiFi.config(ip, gw, sm);
     connectWifi();
 }
 
@@ -404,6 +463,7 @@ void initOTA() {
             });
             ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
                 // Reports update progress.
+                ESPCrashMonitor.iAmAlive();
                 Serial.printf("INFO: OTA Update Progress: %u%%\r", (progress / (total / 100)));
             });
             ArduinoOTA.onError([](ota_error_t error) {
@@ -499,7 +559,6 @@ void onCheckWiFi() {
     Serial.println(F("INFO: Checking WiFi connectivity..."));
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println(F("WARN: Lost connection. Attempting reconnect..."));
-        WiFi.begin(ssid, password);
         connectWifi();
         if (WiFi.status() == WL_CONNECTED) {
             initMDNS();
@@ -571,6 +630,7 @@ void setup() {
  */
 void loop() {
     ESPCrashMonitor.iAmAlive();
+    checkInterrupt();
     taskMan.execute();
     server.handleClient();
     ArduinoOTA.handle();
