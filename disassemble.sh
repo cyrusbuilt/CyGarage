@@ -10,7 +10,7 @@
 echo
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 BOARD=$(awk -F "=" '/board/ {print $2}' ${SCRIPT_DIR}/platformio.ini | tr -d ' ')
-FIRMWARE=${SCRIPT_DIR}/.pioenvs/${BOARD}/firmware.elf
+FIRMWARE=${SCRIPT_DIR}/.pio/build/${BOARD}/firmware.elf
 DUMPFILE=${SCRIPT_DIR}/disassembly.txt
 
 function disassemble {
@@ -34,7 +34,7 @@ function buildFirmware {
     local compiler="$( which platformio )"
     if [[ -z "${compiler}" ]]; then
         echo
-        echo "ERROR: platformio not found. You may need to install using 'sudo -H pip install -U platformio'"
+        echo "ERROR: platformio not found. You may need to install the shell commands."
         echo
         exit 1
     fi

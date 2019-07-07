@@ -1,8 +1,8 @@
-sitemap default label="Main Menu"
+sitemap cygarage label="Main Menu"
 {
-    Frame label="Home"
-    {
-        Switch item=CyGarage mappings=[ON="Door"]
+    Frame label="Home" {
+        Switch item=CyGarage mappings=[ON="Activate"]
         Text item=CyGarageStatus
+        Text item=CyGarageVersion
     }
 }

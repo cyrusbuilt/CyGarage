@@ -1,2 +1,3 @@
-Switch CyGarage "Garage Door" <""> {http=">[ON:POST:http://YOUR_HOSTNAME/device/activate]", autoupdate="false"}
-String CyGarageDoorStatus "Current position [%s]" <garagedoor> {http="<http://YOUR_HOSTNAME/device/status:2000:REGEX((.*?))]"}
+Switch CyGarage "Garage Door" <wallswitch> { http=">[ON:POST:http://<your_ip_here>/device/activate]" }
+String CyGarageStatus "Current position [%s]" <garagedoor> { http="<[http://<your_ip_here>/device/status:2000:REGEX((.*?))]" }
+String CyGarageVersion "Firmware version: [%s]" { http="<[http://<your_ip_here>/version:2000:REGEX((.*?))]" }

@@ -1,32 +1,29 @@
-import org.openhab.model.script.actions.Timer
 
 var Timer statusTimer = null
 
 rule "CyGarageRecCmdON"
-    when
-        Item CyGarage received command
-    then
-        logInfo("CyGarag", "Garage door received command.")
-        sendHttpGetRequest("http://YOUR_HOSTNAME/device/status")
+when
+    Item CyGarage received command
+then
+    logInfo("cygarage.rules", "Garage door received command.")
+    sendHttpGetRequest("http://<your_ip_here>/device/status")
 end
 
 rule "CyGarageOPEN_AJAR_15"
-    when
-        System started or
-        Item CyGarageStatus changed
-    then
-        if (CyGarageStatus.state != "CLOSED") {
-            logInfo("CyGaragStatus", "State != CLOSED")
-            statusTimer = createTimer(now.plusMinutes(15)) [|
-                logInfo("CyGarageStatus", "Garage door has been left AJAR or OPEN for 15 minutes!")
-                sendBroadcastNotifcation("Garage door has been left AJAR or OPEN for 15 minutes!")
-            ]
+when
+    System started or Item CyGarageStatus changed
+then
+    if (CyGarageStatus.state != "CLOSED") {
+        logInfo("CyGaragStatus", "State != CLOSED")
+        statusTimer = createTimer(now.plusMinutes(15), [|
+            logInfo("CyGarageStatus", "Garage door has been left AJAR or OPEN for 15 minutes!")
+            sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
+        ])
+    }
+    else {
+        logInfo("cygarage.rules", "State == CLOSED")
+        if (statusTimer !== null) {
+            statusTimer = null
         }
-        else {
-            logInfo("CyGarageStatus", "State == CLOSED")
-            if (statusTimer != null) {
-                statusTimer.cancel()
-                statusTimer = null
-            }
-        }
+    }
 end
