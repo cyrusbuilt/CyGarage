@@ -29,7 +29,7 @@ In main.cpp, there is a configuration section. Here we'll discuss each option:
 - OTA_HOST_PORT: Defines the port to listen for OTA updates on.
 - OTA_HOST_NAME: The host name for the OTA server. By default this is the same as DEVICE_NAME and is recommended to leave it that way.
 - OTA_PASSWORD: The password used to authenticate with the OTA server.
-- ip: The default IP address. By default, this devices boots with a static IP configuration. The default IP is 192.168.0.141. You can change that here if you wish.
+- ip: The default IP address. By default, this devices boots with a static IP configuration. The default IP is 192.168.0.200. You can change that here if you wish.
 - gw: The default gateway address. The current default is 192.168.0.1. You can change that here if you wish.
 - sm: The subnet mask. By default, it is 255.255.255.0, but you can change that here if need be.
 
@@ -66,3 +66,23 @@ If the device ever fails to connect to WiFi or if you press the 'I' key on your 
 - Get network info - Press 'g'. This will dump network information to the serial console (IP config, WiFi connection info).
 
 - Activiate door - Press 'a'. This allows the user to manually activate the door.
+
+## Dependencies
+
+The firmware dependencies will be installed automatically at compile-time.  However, if you wish to install dependencies prior to compiling (for intellisense or to clear warnings/errors in the VSCode editor) you can run the following command:
+
+```bash
+platformio lib install
+```
+
+Then go to the platformio menu and click "Rebuild IntelliSense index".
+
+## Tools
+
+Included with this firmware is a few handy tools:
+
+- /disassemble.sh - Disassembles the compiled firmware into a plain text file called 'disassembly.txt'. If the firmware has not been built, it will be compiled first, then disassembled. The disassembly output contains the assembly code, C++ calls, and instruction addresses useful for debugging the executing code or determining the cause of crashes at addresses reported by ESPCrashMonitor during boot.
+
+- tools/clear_flash.sh - Completely clears the flash memory on the ESP8266 of all data (including firmware).
+
+- tools/serial_monitor.sh - Just runs the serial monitor. Pretty much the same as clicking 'Monitor' in the platformio menu, but uses its own settings instead of those found in platformio.ini.

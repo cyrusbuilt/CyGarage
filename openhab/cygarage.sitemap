@@ -1,6 +1,6 @@
-sitemap cygarage label="Main Menu"
+sitemap cygarage label="CyGarage"
 {
-    Frame label="Home" {
+    Frame label="Status and Control" {
         Switch item=CyGarage mappings=[ON="Activate"]
         Text item=CyGarageStatus
         Text item=CyGarageVersion

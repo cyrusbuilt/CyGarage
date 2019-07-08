@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# This tool will completely clear the flash memory on your ESP8266. This is useful
+# for troubleshooting flash memory corruption or clearing out old firmware and
+# stored data. Requires esptool.py. If not installed, you will be prompted to
+# install it.
+
 FLASHER="$( which esptool.py )"
 if [[ -z "${FLASHER}" ]]; then
     echo "WARN: Flash tool not installed."
@@ -16,4 +21,5 @@ if [[ -z "${FLASHER}" ]]; then
     fi
 fi
 
+# Modify this line to reflect the path to your USB-to-Serial device.
 ${FLASHER} -p /dev/cu.usbserial-AL05HSL2 erase_flash

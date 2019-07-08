@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v1.0
+ * CyGarage v1.1
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -25,11 +25,8 @@
 #include "TaskScheduler.h"
 #include "ResetManager.h"
 #include "ESPCrashMonitor-master/ESPCrashMonitor.h"
-extern "C" {
-  #include "user_interface.h"
-}
 
-#define FIRMWARE_VERSION "1.0"
+#define FIRMWARE_VERSION "1.1"
 
 // Configuration
 #define ENABLE_OTA                              // Comment this line to disable OTA updates.
@@ -41,13 +38,13 @@ extern "C" {
 #define CHECK_WIFI_INTERVAL 30000               // How often to check WiFi status (milliseconds).
 #define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
 #define ACTIVATION_DURATION 1000                // How long the activation relay should be on.
-#define DEVICE_NAME "CyGarage"                  // The device name.
+#define DEVICE_NAME "CYGARAGE"                  // The device name.
 #ifdef ENABLE_OTA
     #define OTA_HOST_PORT 8266                     // The OTA updater port.
     #define OTA_HOSTNAME DEVICE_NAME               // The OTA updater host name. Should match device name.
     #define OTA_PASSWORD "your_ota_password_here"  // The OTA updater password.
 #endif
-IPAddress ip(192, 168, 0, 141);                 // The default static host IP.
+IPAddress ip(192, 168, 0, 200);                 // The default static host IP.
 IPAddress gw(192, 168, 0, 1);                   // The default static gateway IP.
 IPAddress sm(255, 255, 255, 0);                 // The default static subnet mask.
 
@@ -86,7 +83,9 @@ Scheduler taskMan;
 String ssid = DEFAULT_SSID;
 String password = DEFAULT_PASSWORD;
 bool isDHCP = false;
-bool wasDHCP = false;
+
+// TODO Add ability to store/retrieve network config in EEPROM.
+// TODO Provide embedded web page for changing net config.
 
 /**
  * Waits for user input from the serial console.
@@ -298,6 +297,7 @@ IPAddress getIPFromString(String value) {
 void resumeNormal() {
     Serial.println(F("INFO: Resuming normal operation..."));
     taskMan.enableAll();
+    wifiLED.off();
 }
 
 /**
@@ -310,6 +310,7 @@ void connectWifi() {
     WiFi.persistent(false);
     WiFi.disconnect(true);
     ESPCrashMonitor.defer();
+
     delay(1000);
     if (isDHCP) {
         WiFi.config(0U, 0U, 0U);
@@ -317,10 +318,11 @@ void connectWifi() {
     else {
         WiFi.config(ip, gw, sm);
     }
+
     Serial.println(F("DEBUG: Beginning connection..."));
-    WiFi.begin(ssid.c_str(), password.c_str());
-    
+    WiFi.begin(ssid, password);
     Serial.println(F("DEBUG: Waiting for connection..."));
+    
     const int maxTries = 20;
     int currentTry = 0;
     while ((WiFi.status() != WL_CONNECTED) && (currentTry < maxTries)) {
@@ -344,7 +346,6 @@ void connectWifi() {
  * the specified action if valid.
  */
 void checkCommand() {
-    IPAddress addr(0, 0, 0, 0);
     String str = "";
     char incomingByte = Serial.read();
     switch (incomingByte) {
@@ -366,7 +367,7 @@ void checkCommand() {
             break;
         case 'd':
             // Switch to DHCP mode.
-            WiFi.config(0U, 0U, 0U);
+            WiFi.config(0U, 0U, 0U);  // If set to all zeros, then the SDK assumes DHCP.
             isDHCP = true;
             Serial.println(F("INFO: Set DHCP mode."));
             promptConfig();
@@ -393,7 +394,7 @@ void checkCommand() {
             sm = getIPFromString(str);
             Serial.print(F("New subnet mask: "));
             Serial.println(sm);
-            WiFi.config(ip, gw, sm);
+            WiFi.config(ip, gw, sm);  // If actual IP set, then disables DHCP and assumes static.
             promptConfig();
             checkCommand();
             break;
@@ -670,6 +671,7 @@ void initCrashMonitor() {
  * Bootstrap routine. Executes once at boot and initializes all subsystems in sequence.
  */
 void setup() {
+    // This boot sequence is important. DO NOT ALTER.
     initSerial();
     initCrashMonitor();
     initOutputs();

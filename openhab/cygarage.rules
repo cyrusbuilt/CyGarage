@@ -1,11 +1,12 @@
 
 var Timer statusTimer = null
+val String fileName = "cygarage.rules"
 
 rule "CyGarageRecCmdON"
 when
     Item CyGarage received command
 then
-    logInfo("cygarage.rules", "Garage door received command.")
+    logInfo(fileName, "Garage door received command.")
     sendHttpGetRequest("http://<your_ip_here>/device/status")
 end
 
@@ -14,14 +15,14 @@ when
     System started or Item CyGarageStatus changed
 then
     if (CyGarageStatus.state != "CLOSED") {
-        logInfo("CyGaragStatus", "State != CLOSED")
+        logInfo(fileName, "Garage door is OPEN or AJAR!")
         statusTimer = createTimer(now.plusMinutes(15), [|
-            logInfo("CyGarageStatus", "Garage door has been left AJAR or OPEN for 15 minutes!")
+            logInfo(fileName, "Garage door has been left AJAR or OPEN for 15 minutes!")
             sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
         ])
     }
     else {
-        logInfo("cygarage.rules", "State == CLOSED")
+        logInfo(fileName, "Garage door is CLOSED.")
         if (statusTimer !== null) {
             statusTimer = null
         }
