@@ -6,8 +6,6 @@ Arduino-based (specifically the Adafruit Huzzah ESP8266) IoT garage door opener.
 
 The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
 
-(schematics coming soon)
-
 ## Theory of Operation
 
 The way this is intended to work is: when the device detects that the door is open or ajar, then user can see this status and (if integrated with OpenHAB or some other similar system) can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
