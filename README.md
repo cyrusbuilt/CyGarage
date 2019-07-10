@@ -84,3 +84,7 @@ Included with this firmware is a few handy tools:
 - tools/clear_flash.sh - Completely clears the flash memory on the ESP8266 of all data (including firmware).
 
 - tools/serial_monitor.sh - Just runs the serial monitor. Pretty much the same as clicking 'Monitor' in the platformio menu, but uses its own settings instead of those found in platformio.ini.
+
+## Mobile App
+
+If you choose not to integrate with OpenHAB, you can get similar functionality using the mobile app for iOS and Android located [here](https://github.com/cyrusbuilt/CyGarageMobile).
