@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v1.1
+ * CyGarage v1.2
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -19,25 +19,28 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+#include <FS.h>
 #include "DoorContact.h"
 #include "LED.h"
 #include "Relay.h"
 #include "TaskScheduler.h"
 #include "ResetManager.h"
 #include "ESPCrashMonitor-master/ESPCrashMonitor.h"
+#include "ArduinoJson.h"
 
-#define FIRMWARE_VERSION "1.1"
+#define FIRMWARE_VERSION "1.2"
 
 // Configuration
 #define ENABLE_OTA                              // Comment this line to disable OTA updates.
 #define ENABLE_MDNS                             // Comment this line to disable the MDNS.
+#define CONFIG_FILE_PATH "/config.json"
 #define DEFAULT_SSID "your_ssid_here"           // Put the SSID of your WiFi here.
 #define DEFAULT_PASSWORD "your_password_here"   // Put your WiFi password here.
 #define WEBSERVER_PORT 80                       // The built-in webserver port.
 #define SERIAL_BAUD 115200                      // The BAUD rate (speed) of the serial port (console).
 #define CHECK_WIFI_INTERVAL 30000               // How often to check WiFi status (milliseconds).
 #define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
-#define ACTIVATION_DURATION 1000                // How long the activation relay should be on.
+#define ACTIVATION_DURATION 2500                // How long the activation relay should be on.
 #define DEVICE_NAME "CYGARAGE"                  // The device name.
 #ifdef ENABLE_OTA
     #define OTA_HOST_PORT 8266                     // The OTA updater port.
@@ -80,12 +83,40 @@ Task tCheckWifi(CHECK_WIFI_INTERVAL, TASK_FOREVER, &onCheckWiFi);
 Task tCheckActivation(ACTIVATION_DURATION, TASK_FOREVER, &onCheckActivation);
 Task tCheckSensors(CHECK_SENSORS_INTERVAL, TASK_FOREVER, &onCheckSensors);
 Scheduler taskMan;
+String hostName = DEVICE_NAME;
 String ssid = DEFAULT_SSID;
 String password = DEFAULT_PASSWORD;
 bool isDHCP = false;
+bool filesystemMounted = false;
+int webServerPort = WEBSERVER_PORT;
+#ifdef ENABLE_OTA
+    int otaPort = OTA_HOST_PORT;
+    String otaPassword = OTA_PASSWORD;
+#endif
 
-// TODO Add ability to store/retrieve network config in EEPROM.
-// TODO Provide embedded web page for changing net config.
+
+/**
+ * Gets an IPAddress value from the specified string.
+ * @param value The string containing the IP.
+ * @return The IP address.
+ */
+IPAddress getIPFromString(String value) {
+    unsigned int ip[4];
+    unsigned char buf[value.length()];
+    value.getBytes(buf, value.length());
+    const char* ipBuf = (const char*)buf;
+    sscanf(ipBuf, "%u.%u.%u.%u", &ip[0], &ip[1], &ip[2], &ip[3]);
+    return IPAddress(ip[0], ip[1], ip[2], ip[3]);
+}
+
+/**
+ * Resume normal operation. This will resume any suspended tasks.
+ */
+void resumeNormal() {
+    Serial.println(F("INFO: Resuming normal operation..."));
+    taskMan.enableAll();
+    wifiLED.off();
+}
 
 /**
  * Waits for user input from the serial console.
@@ -147,6 +178,184 @@ void getAvailableNetworks() {
         Serial.println(WiFi.RSSI(i));
     }
     Serial.println(F("----------------------------------"));
+}
+
+/**
+ * Reboots the MCU after a 1 second delay.
+ */
+void reboot() {
+    Serial.println(F("INFO: Rebooting... "));
+    Serial.flush();
+    delay(1000);
+    ResetManager.softReset();
+}
+
+/**
+ * Stores the in-memory configuration to a JSON file stored in SPIFFS.
+ * If the file does not yet exist, it will be created (see CONFIG_FILE_PATH).
+ * Errors will be reported to the serial console if the filesystem is not
+ * mounted or if the file could not be opened for writing. Currently only
+ * stores network configuration settings (IP, WiFi, etc).
+ */
+void saveConfiguration() {
+    Serial.print(F("INFO: Saving configuration to: "));
+    Serial.print(CONFIG_FILE_PATH);
+    Serial.println(F(" ... "));
+    if (!filesystemMounted) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Filesystem not mounted."));
+        return;
+    }
+
+    StaticJsonDocument<350> doc;
+    doc["hostname"] = hostName;
+    doc["useDHCP"] = isDHCP;
+    doc["ip"] = ip.toString();
+    doc["gateway"] = gw.toString();
+    doc["subnetMask"] = sm.toString();
+    doc["wifiSSID"] = ssid;
+    doc["wifiPassword"] = password;
+    doc["webserverPort"] = webServerPort;
+    #ifdef ENABLE_OTA
+        doc["otaPort"] = otaPort;
+        doc["otaPassword"] = otaPassword;
+    #endif
+
+    File configFile = SPIFFS.open(CONFIG_FILE_PATH, "w");
+    if (!configFile) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Failed to open config file for writing."));
+        doc.clear();
+        return;
+    }
+
+    serializeJsonPretty(doc, configFile);
+    doc.clear();
+    configFile.flush();
+    configFile.close();
+    Serial.println(F("DONE"));
+}
+
+/**
+ * Loads the configuration from CONFIG_FILE_PATH into memory and uses that as
+ * the running configuration. Will report errors to the serial console and
+ * revert to the default configuration under the following conditions:
+ * 1) The filesystem is not mounted.
+ * 2) The config file does not exist in SPIFFS. In this case a new file
+ * will be created and populated with the default configuration.
+ * 3) The config file exists, but could not be opened for reading.
+ * 4) The config file is too big ( > 1MB).
+ * 5) The config file could not be deserialized to a JSON structure.
+ */
+void loadConfiguration() {
+    Serial.print(F("INFO: Loading config file: "));
+    Serial.print(CONFIG_FILE_PATH);
+    Serial.print(F(" ... "));
+    if (!filesystemMounted) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Filesystem not mounted."));
+        return;
+    }
+
+    if (!SPIFFS.exists(CONFIG_FILE_PATH)) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("WARN: Config file does not exist. Creating with default config..."));
+        saveConfiguration();
+        return;
+    }
+
+    File configFile = SPIFFS.open(CONFIG_FILE_PATH, "r");
+    if (!configFile) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Unable to open config file. Using default config."));
+        return;
+    }
+
+    size_t size = configFile.size();
+    if (size > 1024) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Config file size is too large. Using default config."));
+        configFile.close();
+        return;
+    }
+
+    std::unique_ptr<char[]> buf(new char[size]);
+    configFile.readBytes(buf.get(), size);
+    configFile.close();
+
+    StaticJsonDocument<350> doc;
+    DeserializationError error = deserializeJson(doc, buf.get());
+    if (error) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Failed to parse config file to JSON. Using default config."));
+        return;
+    }
+
+    hostName = doc["hostname"].as<String>();
+    isDHCP = doc["useDHCP"].as<bool>();
+    if (!ip.fromString(doc["ip"].as<String>())) {
+        Serial.println(F("WARN: Invalid IP in configuration. Falling back to factory default."));
+    }
+    
+    if (!gw.fromString(doc["gateway"].as<String>())) {
+        Serial.println(F("WARN: Invalid gateway in configuration. Falling back to factory default."));
+    }
+    
+    if (sm.fromString(doc["subnetMask"].as<String>())) {
+        Serial.println(F("WARN: Invalid subnet mask in configuration. Falling back to default."));
+    }
+    
+    ssid = doc["wifiSSID"].as<String>();
+    password = doc["wifiPassword"].as<String>();
+    webServerPort = doc["webserverPort"].as<int>();
+    #ifdef ENABLE_OTA
+        otaPort = doc["otaPort"].as<int>();
+        otaPassword = doc["otaPassword"].as<String>();
+    #endif
+
+    doc.clear();
+    Serial.println(F("DONE"));
+}
+
+/**
+ * Confirms with the user that they wish to do a factory restore. If so, then
+ * clears the current configuration file in SPIFFS, then reboots. Upon reboot,
+ * a new config file will be generated with default values.
+ */
+void doFactoryRestore() {
+    Serial.println();
+    Serial.println(F("Are you sure you wish to restore to factory default? (Y/n)?"));
+    waitForUserInput();
+    String str = getInputString();
+    if (str == "Y" || str == "y") {
+        Serial.print(F("INFO: Clearing current config... "));
+        if (filesystemMounted) {
+            if (SPIFFS.remove(CONFIG_FILE_PATH)) {
+                Serial.println(F("DONE"));
+                Serial.print(F("INFO: Removed file: "));
+                Serial.println(CONFIG_FILE_PATH);
+
+                Serial.print(F("INFO: Rebooting in "));
+                for (uint8_t i = 5; i >= 1; i--) {
+                    Serial.print(i);
+                    Serial.print(F(" "));
+                    delay(1000);
+                }
+
+                reboot();
+            }
+            else {
+                Serial.println(F("FAIL"));
+                Serial.println(F("ERROR: Failed to delete configuration file."));
+            }
+        }
+        else {
+            Serial.println(F("FAIL"));
+            Serial.println(F("ERROR: Filesystem not mounted."));
+        }
+    }
+
+    Serial.println();
 }
 
 /**
@@ -225,14 +434,32 @@ void initMDNS() {
                 return;
             }
 
-            mdns.addService(DEVICE_NAME, "http", WEBSERVER_PORT);
-            mdns.addService(OTA_HOSTNAME, "ota", OTA_HOST_PORT);
+            mdns.addService(DEVICE_NAME, "http", webServerPort);
+            #ifdef ENABLE_OTA
+            mdns.addService(OTA_HOSTNAME, "ota", otaPort);
+            #endif
             Serial.println(F(" DONE"));
         }
         else {
             Serial.println(F(" FAILED"));
         }
     #endif
+}
+
+/**
+ * Initialize the SPIFFS filesystem.
+ */
+void initFilesystem() {
+    Serial.print(F("INIT: Initializing SPIFFS and mounting filesystem... "));
+    if (!SPIFFS.begin()) {
+        Serial.println(F("FAIL"));
+        Serial.println(F("ERROR: Unable to mount filesystem."));
+        return;
+    }
+
+    filesystemMounted = true;
+    Serial.println(F("DONE"));
+    loadConfiguration();
 }
 
 /**
@@ -270,34 +497,13 @@ void promptConfig() {
     Serial.println(F("= e: Resume normal operation ="));
     Serial.println(F("= g: Get network info        ="));
     Serial.println(F("= a: Activate door           ="));
+    Serial.println(F("= f: Save config changes     ="));
+    Serial.println(F("= z: Restore default config  ="));
     Serial.println(F("=                            ="));
     Serial.println(F("=============================="));
     Serial.println();
     Serial.println(F("Enter command choice (r/c/s/n/w/e/g): "));
     waitForUserInput();
-}
-
-/**
- * Gets an IPAddress value from the specified string.
- * @param value The string containing the IP.
- * @return The IP address.
- */
-IPAddress getIPFromString(String value) {
-    unsigned int ip[4];
-    unsigned char buf[value.length()];
-    value.getBytes(buf, value.length());
-    const char* ipBuf = (const char*)buf;
-    sscanf(ipBuf, "%u.%u.%u.%u", &ip[0], &ip[1], &ip[2], &ip[3]);
-    return IPAddress(ip[0], ip[1], ip[2], ip[3]);
-}
-
-/**
- * Resume normal operation. This will resume any suspended tasks.
- */
-void resumeNormal() {
-    Serial.println(F("INFO: Resuming normal operation..."));
-    taskMan.enableAll();
-    wifiLED.off();
 }
 
 /**
@@ -351,7 +557,7 @@ void checkCommand() {
     switch (incomingByte) {
         case 'r':
             // Reset the controller.
-            ResetManager.softReset();
+            reboot();
             break;
         case 's':
             // Scan for available networks.
@@ -360,6 +566,14 @@ void checkCommand() {
             checkCommand();
             break;
         case 'c':
+            // Set hostname.
+            Serial.print(F("Current host name: "));
+            Serial.println(hostName);
+            Serial.println(F("Set new host name: "));
+            waitForUserInput();
+            hostName = getInputString();
+            initMDNS();
+
             // Change network mode.
             Serial.println(F("Choose network mode (d = DHCP, t = Static):"));
             waitForUserInput();
@@ -367,9 +581,15 @@ void checkCommand() {
             break;
         case 'd':
             // Switch to DHCP mode.
-            WiFi.config(0U, 0U, 0U);  // If set to all zeros, then the SDK assumes DHCP.
-            isDHCP = true;
-            Serial.println(F("INFO: Set DHCP mode."));
+            if (isDHCP) {
+                Serial.println(F("INFO: DHCP mode already set. Skipping..."));
+                Serial.println();
+            }
+            else {
+                isDHCP = true;
+                Serial.println(F("INFO: Set DHCP mode."));
+                WiFi.config(0U, 0U, 0U);
+            }
             promptConfig();
             checkCommand();
             break;
@@ -378,20 +598,17 @@ void checkCommand() {
             isDHCP = false;
             Serial.println(F("Enter IP address: "));
             waitForUserInput();
-            str = Serial.readStringUntil('\n');
-            ip = getIPFromString(str);
+            ip = getIPFromString(getInputString());
             Serial.print(F("New IP: "));
             Serial.println(ip);
             Serial.println(F("Enter gateway: "));
             waitForUserInput();
-            str = getInputString();
-            gw = getIPFromString(str);
+            gw = getIPFromString(getInputString());
             Serial.print(F("New gateway: "));
             Serial.println(gw);
             Serial.println(F("Enter subnet mask: "));
             waitForUserInput();
-            str = getInputString();
-            sm = getIPFromString(str);
+            sm = getIPFromString(getInputString());
             Serial.print(F("New subnet mask: "));
             Serial.println(sm);
             WiFi.config(ip, gw, sm);  // If actual IP set, then disables DHCP and assumes static.
@@ -442,6 +659,20 @@ void checkCommand() {
             promptConfig();
             checkCommand();
             break;
+        case 'f':
+            // Save configuration changes and restart services.
+            saveConfiguration();
+            WiFi.disconnect(true);
+            onCheckWiFi();
+            promptConfig();
+            checkCommand();
+            break;
+        case 'z':
+            // Reset config to factory default.
+            doFactoryRestore();
+            promptConfig();
+            checkCommand();
+            break;
         default:
             // Specified command is invalid.
             Serial.println(F("WARN: Unrecognized command."));
@@ -484,8 +715,8 @@ void initWiFi() {
     Serial.println(F("INIT: Initializing WiFi... "));
     getAvailableNetworks();
     
-    Serial.print(F("INFO: Connecting to default SSID: "));
-    Serial.print(DEFAULT_SSID);
+    Serial.print(F("INFO: Connecting to SSID: "));
+    Serial.print(ssid);
     Serial.println(F("..."));
     
     connectWifi();
@@ -498,9 +729,9 @@ void initOTA() {
     #ifdef ENABLE_OTA
         Serial.print(F("INIT: Starting OTA updater... "));
         if (WiFi.status() == WL_CONNECTED) {
-            ArduinoOTA.setPort(OTA_HOST_PORT);
-            ArduinoOTA.setHostname(OTA_HOSTNAME);
-            ArduinoOTA.setPassword(OTA_PASSWORD);
+            ArduinoOTA.setPort(otaPort);
+            ArduinoOTA.setHostname(hostName.c_str());
+            ArduinoOTA.setPassword(otaPassword.c_str());
             ArduinoOTA.onStart([]() {
                 // Handles start of OTA update. Determines update type.
                 String type;
@@ -676,6 +907,7 @@ void setup() {
     initCrashMonitor();
     initOutputs();
     initInputs();
+    initFilesystem();
     initWiFi();
     initMDNS();
     initWebServer();

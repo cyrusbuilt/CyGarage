@@ -1,0 +1,12 @@
+{
+    "hostname": "CYGARAGE",
+    "useDHCP": false,
+    "ip": "your_device_ip_here",
+    "gateway": "your_gateway_here",
+    "subnetMask": "your_subnet_mask_here",
+    "wifiSSID": "your_wifi_SSID_here",
+    "wifiPassword": "your_wifi_password_here",
+    "webserverPort": 80,
+    "otaPort": 8266,
+    "otaPassword": "your_OTA_password_here"
+}

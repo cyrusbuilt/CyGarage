@@ -1,6 +1,7 @@
 
 var Timer statusTimer = null
 val String fileName = "cygarage.rules"
+val int notifyDelay = 15
 
 rule "CyGarageRecCmdON"
 when
@@ -14,16 +15,26 @@ rule "CyGarageOPEN_AJAR_15"
 when
     System started or Item CyGarageStatus changed
 then
-    if (CyGarageStatus.state != "CLOSED") {
+    // If not closed and we haven't already started the timer,
+    // then start a new one and alert in 15 min if the door is
+    // still open. Otherwise, kill any existing timer. 
+    if (CyGarageStatus.state != "CLOSED" && statusTimer != null) {
         logInfo(fileName, "Garage door is OPEN or AJAR!")
-        statusTimer = createTimer(now.plusMinutes(15), [|
+        if (statusTimer == null) {
+            statusTimer = createTimer(now.plusMinutes(notifyDelay), [|
             logInfo(fileName, "Garage door has been left AJAR or OPEN for 15 minutes!")
             sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
-        ])
+            ])
+        }
+        else {
+            logInfo(fileName, "Status Timer rescheduled")
+            statusTimer.reschedule(now.plusMinutes(notifyDelay))
+        }
     }
     else {
         logInfo(fileName, "Garage door is CLOSED.")
-        if (statusTimer !== null) {
+        if (statusTimer != null) {
+            statusTimer.cancel()
             statusTimer = null
         }
     }
