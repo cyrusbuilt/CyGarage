@@ -44,7 +44,6 @@
 #define DEVICE_NAME "CYGARAGE"                  // The device name.
 #ifdef ENABLE_OTA
     #define OTA_HOST_PORT 8266                     // The OTA updater port.
-    #define OTA_HOSTNAME DEVICE_NAME               // The OTA updater host name. Should match device name.
     #define OTA_PASSWORD "your_ota_password_here"  // The OTA updater password.
 #endif
 IPAddress ip(192, 168, 0, 200);                 // The default static host IP.
@@ -301,7 +300,7 @@ void loadConfiguration() {
         Serial.println(F("WARN: Invalid gateway in configuration. Falling back to factory default."));
     }
     
-    if (sm.fromString(doc["subnetMask"].as<String>())) {
+    if (!sm.fromString(doc["subnetMask"].as<String>())) {
         Serial.println(F("WARN: Invalid subnet mask in configuration. Falling back to default."));
     }
     
