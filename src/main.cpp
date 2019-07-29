@@ -69,7 +69,10 @@ void failSafe();
 #ifdef ENABLE_MDNS
 MDNSResponder mdns;
 #endif
-ESP8266WebServer server(WEBSERVER_PORT);
+// The webserver is initialized with the default port, but if a different port is
+// loaded from config, then that port is what will be used in initWebserver()
+int webServerPort = WEBSERVER_PORT;
+ESP8266WebServer server(webServerPort);
 // TODO we can probably refactor to use the new DoorContact's events and loop() method,
 // instead of using a scheduled task to periodically poll. We can keep as-is for now
 // though. Nothing 'wrong' with current implementation. Just might not be the best.
@@ -87,7 +90,6 @@ String ssid = DEFAULT_SSID;
 String password = DEFAULT_PASSWORD;
 bool isDHCP = false;
 bool filesystemMounted = false;
-int webServerPort = WEBSERVER_PORT;
 #ifdef ENABLE_OTA
     int otaPort = OTA_HOST_PORT;
     String otaPassword = OTA_PASSWORD;
@@ -428,14 +430,14 @@ void initMDNS() {
         if (WiFi.status() == WL_CONNECTED) {
             ESPCrashMonitor.defer();
             delay(500);
-            if (!mdns.begin(DEVICE_NAME)) {
+            if (!mdns.begin(hostName)) {
                 Serial.println(F(" FAILED"));
                 return;
             }
 
-            mdns.addService(DEVICE_NAME, "http", webServerPort);
+            mdns.addService(hostName, "http", webServerPort);
             #ifdef ENABLE_OTA
-            mdns.addService(OTA_HOSTNAME, "ota", otaPort);
+            mdns.addService(hostName, "ota", otaPort);
             #endif
             Serial.println(F(" DONE"));
         }
@@ -471,7 +473,7 @@ void initWebServer() {
         server.on("/device/status", HTTP_GET, getDeviceStatus);
         server.on("/device/activate", HTTP_POST, activateDoor);
         server.on("/version", HTTP_GET, getFirmwareVersion);
-        server.begin();
+        server.begin(webServerPort);
         Serial.println(F("DONE"));
     }
     else {
