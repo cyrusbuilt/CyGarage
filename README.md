@@ -12,7 +12,7 @@ The way this is intended to work is: when the device detects that the door is op
 
 ## Configuration
 
-In main.cpp, there is a configuration section. Here we'll discuss each option:
+In main.cpp, there is a configuration section. These options are the hardcoded default values that the system will initially boot with. However, if there is a config.json file present in the root of the SPIFFS file system, then it will override these defaults. Here we'll discuss each option:
 
 - ENABLE_OTA: If you do not wish to support OTA updates, just comment this define.
 - ENABLE_MDNS: If you do not wish to support [MDNS](https://tttapa.github.io/ESP8266/Chap08%20-%20mDNS.html), comment this define.
@@ -25,11 +25,29 @@ In main.cpp, there is a configuration section. Here we'll discuss each option:
 - ACTIVATION_DURATION: The amount of time (in milliseconds) to activate the door relay. Default is 1 second and is recommended this value not be changed unless you have good reason for doing so.
 - DEVICE_NAME: This essentially serves as the host name of the device on the network.
 - OTA_HOST_PORT: Defines the port to listen for OTA updates on.
-- OTA_HOST_NAME: The host name for the OTA server. By default this is the same as DEVICE_NAME and is recommended to leave it that way.
 - OTA_PASSWORD: The password used to authenticate with the OTA server.
 - ip: The default IP address. By default, this devices boots with a static IP configuration. The default IP is 192.168.0.200. You can change that here if you wish.
 - gw: The default gateway address. The current default is 192.168.0.1. You can change that here if you wish.
 - sm: The subnet mask. By default, it is 255.255.255.0, but you can change that here if need be.
+
+To override the default configuration options, you need to upload a filesystem image containing a file named 'config.json' in the root of the SPIFFS filesystem. The file should like something link this:
+
+```json
+{
+    "hostname": "CYGARAGE",
+    "useDHCP": false,
+    "ip": "your_device_ip_here",
+    "gateway": "your_gateway_here",
+    "subnetMask": "your_subnet_mask_here",
+    "wifiSSID": "your_wifi_SSID_here",
+    "wifiPassword": "your_wifi_password_here",
+    "webserverPort": 80,
+    "otaPort": 8266,
+    "otaPassword": "your_OTA_password_here"
+}
+```
+
+This configuration file is pretty self explanatory and one is included in the source. The file *MUST* be located in the "data" directory located in the root of the project in order to be picked up by the flash uploader (either via Serial or OTA). Each of the options in the configuration file are self-explanatory and match up with the hard-coded default settings mentioned above. If this file is not present when the firmware boots, a new file will be created and populated with the hardcoded defaults. These defaults can then be changed via the fail-safe menu and saved.
 
 ## Webserver Routes
 
@@ -40,7 +58,7 @@ In main.cpp, there is a configuration section. Here we'll discuss each option:
 
 ## OTA Updates
 
-If you wish to be able to upload firmware updates Over-the-Air, then besides leaving the ENABLE_OTA option uncommented, you will also need to uncomment all the upload_* lines in platformio.ini, and change the line 'upload_port = ' line to reflect the IP of the device and the line '--auth=' to reflect whatever OTA_PASSWORD is set to. Then when you click "upload" from the PlatformIO tasks (or if you execute 'platformio run --target upload' from the command line) it should upload directly over WiFi and once completed, the device will automatically flash itself and reboot with the new version.
+If you wish to be able to upload firmware updates Over-the-Air, then besides leaving the ENABLE_OTA option uncommented, you will also need to uncomment all the upload_* lines in platformio.ini, and change the line 'upload_port = ' line to reflect the IP of the device and the line '--auth=' to reflect whatever OTA_PASSWORD is set to. Then when you click "upload" from the PlatformIO tasks (or if you execute 'platformio run --target upload' from the command line) it should upload directly over WiFi and once completed, the device will automatically flash itself and reboot with the new version. If you wish to upload a new configuration file, you can also do this OTA. Assuming the above-mentioned settings are configured, you chan then click "Upload File System Image" from the PlatformIO project tasks.
 
 ## Serial Console Menu
 
@@ -64,6 +82,10 @@ If the device ever fails to connect to WiFi or if you press the 'I' key on your 
 - Get network info - Press 'g'. This will dump network information to the serial console (IP config, WiFi connection info).
 
 - Activiate door - Press 'a'. This allows the user to manually activate the door.
+
+- Save config changes - Press 'f'. This will save any configuration changes currently stored in memory to config.json.
+
+- Restore default config - Press 'z'. This will restore the firmware configuration back to the factory default settings (the hard-coded defaults). It does this by simply deleting the existing config.json file from flash storage and then immediately rebooting the firmware. Upon reboot, a new config.json file is created and populated with the default settings which are then applied to the running configuration in memory.
 
 ## Dependencies
 
