@@ -17,8 +17,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <ArduinoOTA.h>
 #include <FS.h>
 #include "DoorContact.h"
 #include "LED.h"
@@ -43,6 +41,7 @@
 #define ACTIVATION_DURATION 2500                // How long the activation relay should be on.
 #define DEVICE_NAME "CYGARAGE"                  // The device name.
 #ifdef ENABLE_OTA
+    #include <ArduinoOTA.h>
     #define OTA_HOST_PORT 8266                     // The OTA updater port.
     #define OTA_PASSWORD "your_ota_password_here"  // The OTA updater password.
 #endif
@@ -67,6 +66,7 @@ void failSafe();
 
 // Global vars
 #ifdef ENABLE_MDNS
+#include <ESP8266mDNS.h>
 MDNSResponder mdns;
 #endif
 // The webserver is initialized with the default port, but if a different port is
