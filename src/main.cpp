@@ -145,6 +145,7 @@ String getInputString() {
                 break;
             }
 
+            Serial.print(c);
             result += c;
         }
     }
