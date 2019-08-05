@@ -4,7 +4,7 @@
 
 Arduino-based (specifically the Adafruit Huzzah ESP8266) IoT garage door opener.
 
-The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
+The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is a [PlatformIO](https://platformio.org/) project and is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
 
 ## Theory of Operation
 
@@ -30,7 +30,7 @@ In main.cpp, there is a configuration section. These options are the hardcoded d
 - gw: The default gateway address. The current default is 192.168.0.1. You can change that here if you wish.
 - sm: The subnet mask. By default, it is 255.255.255.0, but you can change that here if need be.
 
-To override the default configuration options, you need to upload a filesystem image containing a file named 'config.json' in the root of the SPIFFS filesystem. The file should like something link this:
+To override the default configuration options, you need to upload a filesystem image containing a file named 'config.json' in the root of the SPIFFS filesystem. The file should like something like this:
 
 ```json
 {
@@ -110,3 +110,11 @@ Included with this firmware is a few handy tools:
 ## Mobile App
 
 If you choose not to integrate with OpenHAB, you can get similar functionality using the mobile app for iOS and Android located [here](https://github.com/cyrusbuilt/CyGarageMobile).
+
+## Integration with Garage Door opener
+
+Once the board is assembled (either by having the board etched or by just soldering the necessary components to perf board and making the connections manually), you will need to mount the board somewhere and then make the necessary connections to the opener. If using door contacts is not an option for you (which was the case for me), it is possible to use the limit switches already mounted to the track to tell the motor to stop when the door is all the way open or all the way closed. Many garage door openers have voltage present on these limit switches. In the case of my Genie, there was 7.7V DC present when the limit switches were open, which then goes to 0V when the switches closed. We can't have that voltage (or current) being fed back in to the inputs on the ESP8266, so rectifier diodes (D1 and D2) were added to the circuit just before J2 and J3 (respectively). This allows us to use the existing switches, but still isolate the ESP8266 from the garage door opener's voltage and prevent ground loops. That being said, the first thing to do is to locate the terminals on the garage door opener that the wall-mounted push button wires to.
+
+*MOST* garage door openers have a button mounted near the interior door that you can press to open/close the garage door. Follow the wires from that button and see which terminals they wire into on the opener. You need to connect 2 wires to the COM and NO screw terminals on the Power Relay Featherwing (I ran appropriate lengths of 18/2 (18 Guage / 2 lead) for all my connections and mounted the CyGarage board on the wall where I could easily get to it). Next, connect 2 wires each to J2 and J3 and then connect the other ends of each to either magnetic door contacts or the limit switches mounted on the trolley track.  If connecting to the limit switches, it is important to be sure that you are connecting the outside terminals (think of these as the negative or ground terminals) to the frame or ground on the track itself and the inside terminals (think of these as the positive terminals) to the switch leads themselves.
+
+Last, you need to connect a 5VDC 1A power supply to J1. I personally used a power adapter for an old USB hub I still had laying around. But a lot of cell phone chargers and the like would work too, or the 5VDC rail from an old PC power supply, or you could build one, which wouldn't be that difficult. If you intend to mount the board somewhere that will be difficult to hook up to a computer later, it would be best to make sure you flash the ESP8266 with the firmware first. Since mine was mounted on the wall near one of my benches, I just set my laptop on the bench and connect the USB-to-Serial cable and flash it right there (when necessary, I mostly just use the OTA feature). I would HIGHLY recommend that you use female headers to create a sort of 'socket' for the Huzzah. That way it can be replaced if something happens or so you can pop it out and flash it if needed.
