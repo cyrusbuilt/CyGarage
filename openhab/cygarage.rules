@@ -18,12 +18,12 @@ then
     // If not closed and we haven't already started the timer,
     // then start a new one and alert in 15 min if the door is
     // still open. Otherwise, kill any existing timer. 
-    if (CyGarageStatus.state != "CLOSED" && statusTimer != null) {
+    if (CyGarageStatus.state != "CLOSED") {
         logInfo(fileName, "Garage door is OPEN or AJAR!")
-        if (statusTimer == null) {
+        if (statusTimer === null) {
             statusTimer = createTimer(now.plusMinutes(notifyDelay), [|
-            logInfo(fileName, "Garage door has been left AJAR or OPEN for 15 minutes!")
-            sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
+                logInfo(fileName, "Garage door has been left AJAR or OPEN for 15 minutes!")
+                sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
             ])
         }
         else {
@@ -33,7 +33,7 @@ then
     }
     else {
         logInfo(fileName, "Garage door is CLOSED.")
-        if (statusTimer != null) {
+        if (statusTimer !== null) {
             statusTimer.cancel()
             statusTimer = null
         }
