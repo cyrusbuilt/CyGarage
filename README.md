@@ -6,9 +6,15 @@ Arduino-based (specifically the Adafruit Huzzah ESP8266) IoT garage door opener.
 
 The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is a [PlatformIO](https://platformio.org/) project and is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
 
+## Important Note on Security
+
+There is none.
+
+No really. Aside from requiring a password for OTA updates, this firmware currently does not implement any security, and therefore can be VERY easily controlled if an actor was able to gain access to your LAN or if you are silly enough to expose this device to the internet (JUST DON'T).  Like a lot of makers, I was more enamored with just getting the thing to work that security came as an afterthought (yes I know.... typical).  That being said, I agree wholeheartedly that security *should* have been considered at the very beginning of this project, but I honestly had trouble figuring out exactly HOW to do that on a device with such limited resources, and then like a lot of flawed engineers I got too distracted with whether or not I *could* that I didn't stop to consider if I *should*. So... I strongly recommend that if you are going to build and implement this device, you do so knowing that you need to make sure your WiFi network is as secure as possible (like don't use the default passwords, change them from time to time, or maybe even put your IoT devices on a separate VLAN, etc).  Afterall, this ulimately controls a physical door to your *HOUSE*.  With that disclaimer out of the way, I do have plans to change the firmware to use MQTT and TLS instead of the plain old HTTP it currently uses for status and control. The use of signed certificates and encrypted messages while not necessarily 100% unhackable, combined with good network and server security, should make it pretty damn close to impossible to hack. Stay tuned for future firmware versions.
+
 ## Theory of Operation
 
-The way this is intended to work is: when the device detects that the door is open or ajar, then user can see this status and (if integrated with OpenHAB or some other similar system) can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
+The way this is intended to work is: when the device detects that the door is open or ajar, the user can see this status and (if integrated with OpenHAB or some other similar system) can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
 
 ## Configuration
 
