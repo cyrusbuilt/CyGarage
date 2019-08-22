@@ -1,12 +1,18 @@
 {
     "hostname": "CYGARAGE",
     "useDHCP": false,
-    "ip": "your_device_ip_here",
-    "gateway": "your_gateway_here",
-    "subnetMask": "your_subnet_mask_here",
-    "wifiSSID": "your_wifi_SSID_here",
+    "ip": "192.168.0.200",
+    "gateway": "192.168.0.1",
+    "subnetMask": "255.255.255.0",
+    "wifiSSID": "your_ssid_here",
     "wifiPassword": "your_wifi_password_here",
     "webserverPort": 80,
     "otaPort": 8266,
-    "otaPassword": "your_OTA_password_here"
+    "otaPassword": "your_ota_password_here",
+    "mqttBroker": "your_mqtt_broker_ip_here",
+    "mqttPort": 8883,
+    "mqttControlChannel": "cygarage/control",
+    "mqttStatusChannel": "cygarage/status",
+    "serverFingerprintPath": "/mqtt.fpn",
+    "caCertificatePath": "/ca.crt"
 }

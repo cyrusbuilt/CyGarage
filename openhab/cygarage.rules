@@ -1,14 +1,35 @@
 
 var Timer statusTimer = null
 val String fileName = "cygarage.rules"
+val String controlChannel = "cygarage/control"
 val int notifyDelay = 15
+val actionsBroker = getActions("mqtt", "mqtt:broker:mosquitto")
 
 rule "CyGarageRecCmdON"
 when
     Item CyGarage received command
 then
-    logInfo(fileName, "Garage door received command.")
-    sendHttpGetRequest("http://<your_ip_here>/device/status")
+    logInfo(fileName, "Garage door received command: " + receivedCommand)
+    if (receivedCommand === ON) {
+        val String ctrlMsg = "{\"client_id\":\"cygarage\",\"command\":2}"
+        logInfo(fileName, "Publishing MQTT payload " + ctrlMsg + " to channel: " + controlChannel)
+        actionsBroker.publishMQTT(controlChannel, ctrlMsg)
+        CyGarage.postUpdate(NULL)
+    }
+end
+
+rule "CyGarageActions"
+when
+    Item CyGarageAction received command
+then
+    val String cmd = CyGarageAction.state.toString()
+    logInfo(fileName, "Got action: " + cmd)
+
+    var String cmdString = "{\"client_id\":\"cygarage\",\"command\":" + cmd + "}"
+    
+    logInfo(fileName, "Publishing MQTT payload " + cmdString + " to channel: " + controlChannel)
+    actionsBroker.publishMQTT(controlChannel, cmdString)
+    CyGarageAction.postUpdate(NULL)
 end
 
 rule "CyGarageOPEN_AJAR_15"

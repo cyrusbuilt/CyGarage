@@ -13,3 +13,11 @@ disassembly.txt
 include/
 lib/
 test/
+
+# SSL/TLS certs
+certs/
+*.der
+*.fp
+*.pem
+*.fpn
+*.crt
