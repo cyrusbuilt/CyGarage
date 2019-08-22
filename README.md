@@ -4,34 +4,39 @@
 
 Arduino-based (specifically the Adafruit Huzzah ESP8266) IoT garage door opener.
 
-The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is a [PlatformIO](https://platformio.org/) project and is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
+The code in this repository represents the Firmware for the CyGarage IoT garage door opener device, as well as some components for integrating with [OpenHAB2](https://openhab.org).  CyGarage is a [PlatformIO](https://platformio.org/) project and is meant to integrate with an existing garage door opener and provide 2 things: The ability to detect the door's state (open, close, or ajar) and the ability to control the door over HTTP/MQTT. Since there is an [ESP8266](https://www.adafruit.com/product/2471) at the heart of it, that means it is WiFi-enabled and is capable of OTA (Over-the-Air) firmware updates.
 
 ## Important Note on Security
 
-There is none.
-
-No really. Aside from requiring a password for OTA updates, this firmware currently does not implement any security, and therefore can be VERY easily controlled if an actor was able to gain access to your LAN or if you are silly enough to expose this device to the internet (JUST DON'T).  Like a lot of makers, I was more enamored with just getting the thing to work that security came as an afterthought (yes I know.... typical).  That being said, I agree wholeheartedly that security *should* have been considered at the very beginning of this project, but I honestly had trouble figuring out exactly HOW to do that on a device with such limited resources, and then like a lot of flawed engineers I got too distracted with whether or not I *could* that I didn't stop to consider if I *should*. So... I strongly recommend that if you are going to build and implement this device, you do so knowing that you need to make sure your WiFi network is as secure as possible (like don't use the default passwords, change them from time to time, or maybe even put your IoT devices on a separate VLAN, etc).  Afterall, this ulimately controls a physical door to your *HOUSE*.  With that disclaimer out of the way, I do have plans to change the firmware to use MQTT and TLS instead of the plain old HTTP it currently uses for status and control. The use of signed certificates and encrypted messages while not necessarily 100% unhackable, combined with good network and server security, should make it pretty damn close to impossible to hack. Stay tuned for future firmware versions.
+CyGarage firmware versions prior to v1.3 had no security built-in and used basic unencrypted HTTP requests for control. There was no SSL (HTTPS) or authentication of any kind. This was a major concern because if someone opened access to the device through their firewall or if a malicious actor were to gain access to the WiFi LAN the device was attached to, being able to open the garage door was trivial. Simply send an HTTP POST to the activation URL and the door opens.  However, starting in v1.3, the default is to use [MQTT](http://mqtt.org/) to pass control messages in JSON format and in turn the device sends status messages in JSON format to MQTT subscribers (such as OpenHAB2). Additionally, these messages are transferred to/from MQTT over TLS using SSL certificates so that the messages are encrypted.  You cannot send control messages to CyGarage directly. You have to publish them to the control channel on the MQTT broker that CyGarage is subscribed to. Additionally, you would need the appropriate certificate and SHA256 fingerprint to connect to and publish the control messages. This security architecture is certainly not infalible, but definitely adds a strong layer of security that was non-existent in previous versions and also provides some means of hardening that security even further (such as using certificates signed by an RSA CA (as opposed to self-signed certs) and using password authentication with the MQTT broker on top of that. You can even configure OpenHAB2 to communicate with the MQTT broker using TLS as well, although this is overkill if the broker is running on the same machine as OpenHAB2 and/or the MQTT standard port is bound to the OpenHAB2 host).
 
 ## Theory of Operation
 
-The way this is intended to work is: when the device detects that the door is open or ajar, the user can see this status and (if integrated with OpenHAB or some other similar system) can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
+The way this is intended to work is: when the device detects that the door is open or ajar, the user can see this status and (if integrated with OpenHAB or some other similar system) and can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
 
 ## Configuration
 
-In main.cpp, there is a configuration section. These options are the hardcoded default values that the system will initially boot with. However, if there is a config.json file present in the root of the SPIFFS file system, then it will override these defaults. Here we'll discuss each option:
+The config.h file contains default configuration directives. These options are the hardcoded default values that the system will initially boot with. However, if there is a config.json file present in the root of the SPIFFS file system, then it will override these defaults. Here we'll discuss each option:
 
 - ENABLE_OTA: If you do not wish to support OTA updates, just comment this define.
 - ENABLE_MDNS: If you do not wish to support [MDNS](https://tttapa.github.io/ESP8266/Chap08%20-%20mDNS.html), comment this define.
+- ENABLE_WEBSERVER: This option is disabled by default for security reasons. Only uncomment this line if you know what you are doing or if you absolutely need it for backward compatibility with older versions of CyGarageMobile.
+- CONFIG_FILE_PATH: This is the path to the configuration file. The default is /config.json. The values in this file will override these defaults.
 - DEFAULT_SSID: Change this line to reflect the SSID of your WiFi network.
 - DEFAULT_PASSWORD: Change this line to reflect the password to your WiFi network.
-- WEBSERVER_PORT: If you wish to use a port number other than the standard HTTP port, you can change that here.
+- WEBSERVER_PORT: If you wish to use a port number other than the standard HTTP port, you can change that here. This option is ignored if ENABLE_WEBSERVER is disabled.
 - SERIAL_BAUD: While it is not recommended, you can change the BAUD rate of the serial port here.
 - CHECK_WIFI_INTERVAL: The interval (in milliseconds) to check to make sure the device is still connected to WiFi, and if not attempt to reconnect. Default is 30 seconds.
 - CHECK_SENSORS_INTERVAL: The interval (in millisceonds) to check the door contact sensors to determine door state. Default is 3 seconds.
-- ACTIVATION_DURATION: The amount of time (in milliseconds) to activate the door relay. Default is 1 second and is recommended this value not be changed unless you have good reason for doing so.
+- ACTIVATION_DURATION: The amount of time (in milliseconds) to activate the door relay. Default is 2.5 seconds and is recommended this value not be changed unless you have good reason for doing so.
 - DEVICE_NAME: This essentially serves as the host name of the device on the network.
-- OTA_HOST_PORT: Defines the port to listen for OTA updates on.
-- OTA_PASSWORD: The password used to authenticate with the OTA server.
+- CHECK_MQTT_INTERVAL: The interval (in milliseconds) to check connectivity to the MQTT broker. If the connection is lost, a reconnect will occur. The default value is 35 seconds.
+- MQTT_TOPIC_STATUS: The MQTT status topic to publish device status messages to. Default is 'cygarage/status'.
+- MQTT_TOPIC_CONTROL: The MQTT control topic to subscribe to for control messages. Default is 'cygarage/control'.
+- MQTT_BROKER: The hostname or IP of the MQTT broker.
+- MQTT_PORT: The port on the MQTT broker to connect to. The default is 8883 (default port for MQTT over TLS).
+- OTA_HOST_PORT: Defines the port to listen for OTA updates on. This option is ignored if ENABLE_OTA is disabled.
+- OTA_PASSWORD: The password used to authenticate with the OTA server. This option is ignored if ENABLE_OTA is disabled.
 - ip: The default IP address. By default, this devices boots with a static IP configuration. The default IP is 192.168.0.200. You can change that here if you wish.
 - gw: The default gateway address. The current default is 192.168.0.1. You can change that here if you wish.
 - sm: The subnet mask. By default, it is 255.255.255.0, but you can change that here if need be.
@@ -49,13 +54,26 @@ To override the default configuration options, you need to upload a filesystem i
     "wifiPassword": "your_wifi_password_here",
     "webserverPort": 80,
     "otaPort": 8266,
-    "otaPassword": "your_OTA_password_here"
+    "otaPassword": "your_OTA_password_here",
+    "mqttBroker": "your_MQTT_broker_here",
+    "mqttPort": 8883,
+    "mqttControlChannel": "cygarage/control",
+    "mqttStatusChannel": "cygarage/status",
+    "serverFingerprintPath": "/mqtt.fpn",
+    "caCertificatePath": "/ca.crt"
 }
 ```
 
-This configuration file is pretty self explanatory and one is included in the source. The file *MUST* be located in the "data" directory located in the root of the project in order to be picked up by the flash uploader (either via Serial or OTA). Each of the options in the configuration file are self-explanatory and match up with the hard-coded default settings mentioned above. If this file is not present when the firmware boots, a new file will be created and populated with the hardcoded defaults. These defaults can then be changed via the fail-safe menu and saved.
+This configuration file is pretty self explanatory and one is included in the source. The file *MUST* be located in the "data" directory located in the root of the project in order to be picked up by the flash uploader (either via Serial or OTA). Each of the options in the configuration file are self-explanatory and match up with the hard-coded default settings mentioned above. If this file is not present when the firmware boots, a new file will be created and populated with the hardcoded defaults. These defaults can then be changed via the fail-safe menu and saved. You'll notice a couple of additional options in the config.json file not present in config.h. They are as follows:
+
+- serverFingerprintPath: The path to the file containing the MQTT broker's SHA256 fingerprint. Default is '/mqtt.fpn'.
+- caCertificatePath: The path to the CA certificate that the MQTT broker's certificate was signed with. Default is '/ca.crt'.
+
+If the above values are omitted or invalid, then the system will fail during loadCertificates() and will not be able to connect to MQTT.
 
 ## Webserver Routes
+
+These routes are *ONLY* exposed if the ENABLE_WEBSERVER directive is uncommented.
 
 - GET /    (Returns "Server ok..." in plain text)
 - GET /version (Returns the firmware version in plain text)
@@ -64,7 +82,7 @@ This configuration file is pretty self explanatory and one is included in the so
 
 ## OTA Updates
 
-If you wish to be able to upload firmware updates Over-the-Air, then besides leaving the ENABLE_OTA option uncommented, you will also need to uncomment all the upload_* lines in platformio.ini, and change the line 'upload_port = ' line to reflect the IP of the device and the line '--auth=' to reflect whatever OTA_PASSWORD is set to. Then when you click "upload" from the PlatformIO tasks (or if you execute 'platformio run --target upload' from the command line) it should upload directly over WiFi and once completed, the device will automatically flash itself and reboot with the new version. If you wish to upload a new configuration file, you can also do this OTA. Assuming the above-mentioned settings are configured, you chan then click "Upload File System Image" from the PlatformIO project tasks.
+If you wish to be able to upload firmware updates Over-the-Air, then besides leaving the ENABLE_OTA option uncommented, you will also need to uncomment all the upload_* lines in platformio.ini, and change the line 'upload_port = ' line to reflect the IP of the device and the line '--auth=' to reflect whatever OTA_PASSWORD is set to. Then when you click "upload" from the PlatformIO tasks (or if you execute 'platformio run --target upload' from the command line) it should upload directly over WiFi and once completed, the device will automatically flash itself and reboot with the new version. If you wish to upload a new configuration file, you can also do this via OTA. Assuming the above-mentioned settings are configured, you can then click "Upload File System Image" from the PlatformIO project tasks.
 
 ## Serial Console Menu
 
@@ -79,7 +97,7 @@ If the device ever fails to connect to WiFi or if you press the 'I' key on your 
 
 - Scan wireless networks - Press 's'. This will scan for available wireless networks and dump a table of the networks it found to the console.
 
-- Connect to new network - Press 'n'. This option prompts the user for a new SSID and password for different WiFi network to connect to. This option is currently experimental and doesn't seem to work that well.
+- Connect to new network - Press 'n'. This option prompts the user for a new SSID and password for different WiFi network to connect to.
 
 - Reconnect to WiFi - Press 'w'. This can be used to reconnect to the current WiFi network if the connection was lost.
 
@@ -113,9 +131,11 @@ Included with this firmware is a few handy tools:
 
 - tools/serial_monitor.sh - Just runs the serial monitor. Pretty much the same as clicking 'Monitor' in the platformio menu, but uses its own settings instead of those found in platformio.ini.
 
+- tools/generate_mqtt_certs.sh - Generates the necessary certificates for the MQTT broker and CyGarage to communicate over TLS.
+
 ## Mobile App
 
-If you choose not to integrate with OpenHAB, you can get similar functionality using the mobile app for iOS and Android located [here](https://github.com/cyrusbuilt/CyGarageMobile).
+If you choose not to integrate with OpenHAB2, you can get similar functionality using the mobile app for iOS and Android located [here](https://github.com/cyrusbuilt/CyGarageMobile). (NOTE: As of 8/21/2019, the most current version of CyGarageMobile is only compatible with CyGarage firmware version prior to v1.3, or if the ENABLE_WEBSERVER option is enabled in v1.3 or higher). If you intend to integrate with OpenHAB2, you can also use the OpenHAB mobile application (recommended).
 
 ## Integration with Garage Door opener
 

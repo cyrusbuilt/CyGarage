@@ -1,0 +1,21 @@
+Bridge mqtt:broker:mosquitto "MQTT Broker Mosquitto" @ "MQTT" [
+    // Modify these settings as need to match your broker.
+    host="localhost",
+    port=1883,
+    secure=false,
+    clientID="openhab2",
+    qos=0,
+    retain=false,
+    keep_alive_time=30000,
+    reconnect_time=60000
+    // Can also add username and password here if needed.
+] {
+    Thing topic cygarage "MQTT Thing CyGarage" @ "CyGarage" {
+        Channels:
+            Type switch : Activator [commandTopic="cygarage/control"]
+            Type string : DoorState [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.state"]
+            Type string : Version [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.firmwareVersion"]
+            Type number : SysState [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.systemState"]
+            Type string : SysID [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.client_id"]
+    }
+}

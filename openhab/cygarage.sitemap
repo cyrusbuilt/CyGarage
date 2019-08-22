@@ -1,8 +1,15 @@
 sitemap cygarage label="CyGarage"
 {
     Frame label="Status and Control" {
+        Text item=CyGarageSystemID
+        Text item=CyGarageVersion
+        Text item=CyGarageSysState label="System State: Booting" visibility=[CyGarageSysState==0]
+        Text item=CyGarageSysState label="System State: Normal" visibility=[CyGarageSysState==1]
+        Text item=CyGarageSysState label="System State: Updating" visibility=[CyGarageSysState==2]
+        Text item=CyGarageSysState label="System State: Disabled" visibility=[CyGarageSysState==3]
+        Text item=CyGarageSysState label="System State: Offline" visibility=[CyGarageSysState==NULL,CyGarageSysState==UNDEF]
         Switch item=CyGarage mappings=[ON="Activate"]
         Text item=CyGarageStatus
-        Text item=CyGarageVersion
+        Selection item=CyGarageAction label="Actions" mappings=[0="Disable",1="Enable",3="Reboot",4="Request Status"]
     }
 }
