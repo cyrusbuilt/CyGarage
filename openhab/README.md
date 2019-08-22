@@ -17,7 +17,7 @@ To install mosquitto, follow the download and install instructions [here](https:
 Next we need to generate the necessary SSL certificates that will be used for communication over TLS.  There is a shell script in the tools directory that simplifies this process. Just run:
 
 ```bash
-> tools/.generate_mqtt_certs.sh
+> tools/./generate_mqtt_certs.sh
 ```
 
 You will first be prompted for the hostname and IP address of your MQTT broker (in this example, it is the same as the your OpenHAB2 server). It will also prompt you for some additional information such as country, state/province, Organizational Unit, org name, etc. It will also prompt you for a password. Make note of this password. When the script is finished it will output a bunch of files in tools/certs. As the script indicates, the ones we are most interested in are host_name.key.pem, hostname_.crt.pem, and ca.crt.pem (where host_name is the host name you provided when the tool first ran). These 3 files need to be copied somewhere on your MQTT server. For this example let's assume /etc/mosquitto/certs.
@@ -41,7 +41,7 @@ First make sure the following line is present:
 listener 1883 localhost
 ```
 
-This binds port 1883 (the default non-SSL port) for MQTT to only allow traffic from the local host.  All other traffic will then have to go through another port. In our case, 'all other traffic' will be encrypted traffic. This means we need to define another port and supply the certificates like so:
+This binds port 1883 (the default non-SSL port) for MQTT to only allow traffic from the local host.  This is done because encrypting the traffic between OH2 and MQTT when they are running on the same host is overkill, but we also need to make sure that *ONLY* the localhost can do this.  All other traffic will then have to go through another port. In our case, 'all other traffic' will be encrypted traffic. This means we need to define another port and supply the certificates like so:
 
 ```txt
 listener 1883 localhost
@@ -137,7 +137,7 @@ You will need the following dependent add-ons installed in OpenHAB2 for these co
 
 - You also need to connect your local OpenHAB server to a cloud instance in order to receive push notifications.
 
-This is because cygarage.rules makes use of the sendBroadcastNotification() method which assumes you have linked your local OH2 server to a cloud OH2 instance, which can then make use of push notifications. If you not wish to use push notifications or just don't want to link your local installation to a secure cloud instance, then don't install the cloud connector and comment out the necessary line cygarage.rules.
+This is because cygarage.rules makes use of the sendBroadcastNotification() method which assumes you have linked your local OH2 server to a cloud OH2 instance, which can then make use of push notifications. If you do not wish to use push notifications or just don't want to link your local installation to a secure cloud instance, then don't install the cloud connector and comment out the necessary line cygarage.rules.
 
 If all went well, you can now use CyGarage with your OH2 installation and control and monitor the garage door (securely) using the OH2 web console or via the OH2 mobile app.
 

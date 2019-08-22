@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo
-echo <<EOF
+cat >> /dev/stdout << EOF
 This tool will generate a Certificate Authority (CA), which
 is then used to generate and sign server certificates and fingerprint
 used for encrytped 2-way communication between CYGARAGE and an MQTT
