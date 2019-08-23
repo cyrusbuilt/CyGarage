@@ -71,6 +71,31 @@ This configuration file is pretty self explanatory and one is included in the so
 
 If the above values are omitted or invalid, then the system will fail during loadCertificates() and will not be able to connect to MQTT.
 
+## Getting Started
+
+After you've configured everything they way you need it (as discussed above), build the firmware by either clicking "Build" in the PlatformIO tasks menu, or by opening a terminal to the project directory and typing:
+
+```bash
+> platformio run
+```
+
+NOTE: The first time you flash the Huzzah, you need to do so over serial (since the OTA code isn't there yet), but subsequent uploads can be done via OTA if configured properly.
+
+The next thing to do is connect the Huzzah to your computer using an FTDI cable like [this one](https://www.adafruit.com/product/70?gclid=EAIaIQobChMIm7-50ZiZ5AIVlIvICh284QPxEAQYBCABEgJkcPD_BwE) and then configure the port in platformio.ini like so:
+
+![config](assets/upload_port.jpg)
+
+With the above mentioned FTDI cable attached to my MacBook, the port appears as it does in the config file above (usually PlatformIO is pretty good about auto-detecting the port for you).
+
+Now all you have to do is flash the firmware onto the Huzzah. You can do this by first pressing and holding the "GPIO" button and then press the "reset" button and let go of both on the Huzzah to put it into flash mode (this is not necessary when you flash via OTA), then click the "Upload and Monitor" task in the PlatformIO menu or by typing the following into the terminal:
+
+```bash
+> platformio run --target upload
+> platformio device monitor --baud 115200 --port /dev/cu.usbserial-AL05HSL2
+```
+
+Once complete, press the "reset" button on the Huzzah. You should see the device boot up in the serial console. Now put the device back into flash mode. If you are using MQTT over TLS (recommended) then visit the readme in the "openhab" folder (even if you ultimately are not connecting MQTT to OpenHAB) for instructions on generating the necessary files for connecting CyGarage to MQTT, otherwise just click the "Upload File System Image" task in the PlatformIO menu. When finished, press the "reset" button again and the device will reboot and come back up with your new configuration settings.
+
 ## Webserver Routes
 
 These routes are *ONLY* exposed if the ENABLE_WEBSERVER directive is uncommented.
@@ -87,6 +112,8 @@ If you wish to be able to upload firmware updates Over-the-Air, then besides lea
 ## Serial Console Menu
 
 If the device ever fails to connect to WiFi or if you press the 'I' key on your keyboard while in the serial console, normal operation of the device is suspended and the device will fall into a 'fail-safe' mode and present the user with a command menu. Here we will discuss those menu options:
+
+![Console Menu](assets/serial_console.jpg)
 
 - Reboot - press 'r' - Self-explanatory. Reboots the device.
 - Configure network - press 'c'. Configure the network.

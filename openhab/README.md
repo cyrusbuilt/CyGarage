@@ -129,6 +129,14 @@ The service should be active. So let's test it:
 
 Now if you navigate to BasicUI in OH2 and click the CyGarage sitemap, you should see the System ID is "test", Firmware version is "1.3", System State is "Booting 0" and Current position is "CLOSED".
 
+CyGarage Sitemap (Web Version)
+
+![Web Dashboard](../assets/web_dashboard.jpg)
+
+CyGarage Sitemap (OH2 Mobile App Version)
+
+![Mobile Dashboard](../assets/OH2_Mobile.jpg)
+
 ## Dependencies
 
 You will need the following dependent add-ons installed in OpenHAB2 for these components to work correctly:
@@ -149,4 +157,8 @@ At this point the only thing left to do if you haven't already is to compile and
 > mosquitto_pub -h localhost -p 1883 -t cygarage/control -m "{\"client_id\":\"CYGARAGE\",\"command\": 4}"
 ```
 
-The 'data' directory in this project should now contain 3 files: config.json, ca.crt, and mqtt.fpn. If so, click "Upload File System image" from the PlatformIO tasks and it will upload those files to CyGarage and it will reboot when finished. Once it comes back up, it should be able to establish a connection to MQTT and you should see it's status in OH2.
+The 'data' directory in this project should now contain 3 files: config.json, ca.crt, and mqtt.fpn.
+
+![Data Folder](../assets/data_dir.jpg)
+
+If so, click "Upload File System image" from the PlatformIO tasks and it will upload those files to CyGarage and it will reboot when finished. Once it comes back up, it should be able to establish a connection to MQTT and you should see it's status in OH2.
