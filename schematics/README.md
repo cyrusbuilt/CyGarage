@@ -24,6 +24,6 @@ When DC1 (connected to J2) closes, the controller will consider the door to be i
 
 When DC2 (connected to J3) closes the controller will consider the door to be in the 'closed' state (unless DC1 is also closed, which should never happen). This is because the contact and associated magnet should be mounted so that the magnet aligns with the contact when the garage door is all the way closed. Should the contact separate from the magnet, the door will be considered to be in the 'ajar' state.
 
-NO and COM on the relay should connect to the button terminals on the garage door opener. When the relay activates, these will be connected for approx. 1 second and then open again, thus simulating a momentary button press which should in turn activate the garage door opener.
+NO and COM on the relay should connect to the button terminals on the garage door opener. When the relay activates, these will be connected for approx. 2.5 seconds and then open again, thus simulating a momentary button press which should in turn activate the garage door opener.
 
 Additionally, I opted to use stacking headers where the pins of the ESP8266 should go (creating a "socket" of sorts) to allow the module to be removable. This is optional, but handy in the event that the module ever becomes damaged or if the EEPROM wears out, or something of that nature, it can be easily replaced.

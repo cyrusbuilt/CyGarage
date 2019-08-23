@@ -73,7 +73,7 @@ If the above values are omitted or invalid, then the system will fail during loa
 
 ## Getting Started
 
-After you've configured everything they way you need it (as discussed above), build the firmware by either clicking "Build" in the PlatformIO tasks menu, or by opening a terminal to the project directory and typing:
+After you've configured everything the way you need it (as discussed above), build the firmware by either clicking "Build" in the PlatformIO tasks menu, or by opening a terminal to the project directory and typing:
 
 ```bash
 > platformio run
