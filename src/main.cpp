@@ -29,7 +29,7 @@
 #include "TelemetryHelper.h"
 #include "config.h"
 
-#define FIRMWARE_VERSION "1.3"
+#define FIRMWARE_VERSION "1.4"
 
 // Workaround to allow an MQTT packet size greater than the default of 128.
 #ifdef MQTT_MAX_PACKET_SIZE
@@ -92,6 +92,8 @@ String serverFingerprintPath;
 String caCertificatePath;
 String fingerprintString;
 String lastState = "";
+String mqttUsername = "";
+String mqttPassword = "";
 int mqttPort = MQTT_PORT;
 bool isDHCP = false;
 bool filesystemMounted = false;
@@ -275,6 +277,8 @@ void saveConfiguration() {
     doc["mqttPort"] = mqttPort;
     doc["mqttControlChannel"] = controlChannel;
     doc["mqttStatusChannel"] = statusChannel;
+    doc["mqttUsername"] = mqttUsername;
+    doc["mqttPassword"] = mqttPassword;
     #ifdef ENABLE_WEBSERVER
         doc["webserverPort"] = webServerPort;
     #endif
@@ -378,6 +382,8 @@ void loadConfiguration() {
     mqttPort = doc["mqttPort"].as<int>();
     controlChannel = doc["mqttControlChannel"].as<String>();
     statusChannel = doc["mqttStatusChannel"].as<String>();
+    mqttUsername = doc["mqttUsername"].as<String>();
+    mqttPassword = doc["mqttPassword"].as<String>();
     serverFingerprintPath = doc["serverFingerprintPath"].as<String>();
     caCertificatePath = doc["caCertificatePath"].as<String>();
     #ifdef ENABLE_OTA
@@ -549,7 +555,15 @@ bool reconnectMqttClient() {
             }
         }
 
-        if (mqttClient.connect(hostName.c_str())) {
+        bool didConnect = false;
+        if (mqttUsername.length() > 0 && mqttPassword.length() > 0) {
+            didConnect = mqttClient.connect(hostName.c_str(), mqttUsername.c_str(), mqttPassword.c_str());
+        }
+        else {
+            didConnect = mqttClient.connect(hostName.c_str());
+        }
+
+        if (didConnect) {
             Serial.print(F("INFO: Subscribing to channel: "));
             Serial.println(controlChannel);
             mqttClient.subscribe(controlChannel.c_str());

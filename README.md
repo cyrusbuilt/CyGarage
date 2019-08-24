@@ -59,6 +59,8 @@ To override the default configuration options, you need to upload a filesystem i
     "mqttPort": 8883,
     "mqttControlChannel": "cygarage/control",
     "mqttStatusChannel": "cygarage/status",
+    "mqttUsername": "your_mqtt_username_here",
+    "mqttPassword": "your_mqtt_password_here",
     "serverFingerprintPath": "/mqtt.fpn",
     "caCertificatePath": "/ca.crt"
 }
@@ -66,6 +68,8 @@ To override the default configuration options, you need to upload a filesystem i
 
 This configuration file is pretty self explanatory and one is included in the source. The file *MUST* be located in the "data" directory located in the root of the project in order to be picked up by the flash uploader (either via Serial or OTA). Each of the options in the configuration file are self-explanatory and match up with the hard-coded default settings mentioned above. If this file is not present when the firmware boots, a new file will be created and populated with the hardcoded defaults. These defaults can then be changed via the fail-safe menu and saved. You'll notice a couple of additional options in the config.json file not present in config.h. They are as follows:
 
+- mqttUsername: If you have enabled password authentication on your MQTT broker, provide the username here.
+- mqttPassword: If you have enabled password authentication on your MQTT broker, provide the password for the username above. If *both* the username and password are provided, then CyGarage will attempt to connect to the broker with the provided credentials; Otherwise, it will attempt to connect without credentials.
 - serverFingerprintPath: The path to the file containing the MQTT broker's SHA256 fingerprint. Default is '/mqtt.fpn'.
 - caCertificatePath: The path to the CA certificate that the MQTT broker's certificate was signed with. Default is '/ca.crt'.
 

@@ -7,7 +7,9 @@ Bridge mqtt:broker:mosquitto "MQTT Broker Mosquitto" @ "MQTT" [
     qos=0,
     retain=false,
     keep_alive_time=30000,
-    reconnect_time=60000
+    reconnect_time=60000,
+    //username="your_mqtt_username",
+    //password="your_mqtt_password"
     // Can also add username and password here if needed.
 ] {
     Thing topic cygarage "MQTT Thing CyGarage" @ "CyGarage" {
