@@ -89,11 +89,40 @@ mqtt:localBroker.clientId=openhab2
 mqtt:localBroker.qos=0
 ```
 
-Save and close the file. Next we need to copy the following files to the openhab-conf folder on the server:
+Save and close the file.
+
+## Optional password authentication
+
+If you wish to use password authentication with Mosquitto, then there are some additional steps. First, you need to generate the password file.
+
+```bash
+> sudo mosquitto_passwd -c /etc/mosquitto/passwd cygarage
+```
+
+Where "cygarage" is the username. You can make this whatever you want as long as this same username is what you put in the CyGarage config and in the cygarage.things file. Next, we need to modify the mosquitto config again:
+
+```bash
+> sudo nano /etc/mosquitto/mosquitto.conf
+```
+
+And add the following lines to the file:
+
+```txt
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+```
+
+Save and close, then restart the service:
+
+```bash
+> sudo systemctl restart mosquitto.service
+```
+
+Next we need to copy the following files to the openhab-conf folder on the server:
 
 ## cygarage.things
 
-This is a "Thing" definition for CyGarage that binds the channels we need to MQTT.  You can edit the binding if needed, then copy this file to the openhab-conf/things directory.
+This is a "Thing" definition for CyGarage that binds the channels we need to MQTT.  You can edit the binding if needed, (such as adding the mosquitto username and password, hostname or IP and port) then copy this file to the openhab-conf/things directory.
 
 ## cygarage.items
 
