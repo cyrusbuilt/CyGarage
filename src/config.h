@@ -1,6 +1,6 @@
 /**
  * config.h
- * CyGarage v1.3
+ * CyGarage v1.5
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -28,9 +28,11 @@
 #ifdef ENABLE_WEBSERVER
     #define WEBSERVER_PORT 80                   // The built-in webserver port.
 #endif
+#define CLOCK_TIMEZONE -4                       // The timezone this device is located in. (For example, EST when observing DST = GMT-4, when not = GMT-5)
 #define SERIAL_BAUD 115200                      // The BAUD rate (speed) of the serial port (console).
 #define CHECK_WIFI_INTERVAL 30000               // How often to check WiFi status (milliseconds).
 #define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
+#define CLOCK_SYNC_INTERVAL 3600000             // How often to sync the local clock with NTP (milliseconds).
 #define ACTIVATION_DURATION 2500                // How long the activation relay should be on.
 #define DEVICE_NAME "CYGARAGE"                  // The device name.
 #define CHECK_MQTT_INTERVAL 35000               // MQTT connectivity check interval (milliseconds).
@@ -46,5 +48,6 @@
 IPAddress ip(192, 168, 0, 200);                 // The default static host IP.
 IPAddress gw(192, 168, 0, 1);                   // The default static gateway IP.
 IPAddress sm(255, 255, 255, 0);                 // The default static subnet mask.
+IPAddress dns(gw);                              // The default static DNS server IP (same as gateway for most residential setups)
 
 #endif

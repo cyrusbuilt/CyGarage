@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v1.3
+ * CyGarage v1.5
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -18,6 +18,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 #include <FS.h>
+#include <time.h>
 #include "DoorContact.h"
 #include "LED.h"
 #include "Relay.h"
@@ -29,7 +30,7 @@
 #include "TelemetryHelper.h"
 #include "config.h"
 
-#define FIRMWARE_VERSION "1.4"
+#define FIRMWARE_VERSION "1.5"
 
 // Workaround to allow an MQTT packet size greater than the default of 128.
 #ifdef MQTT_MAX_PACKET_SIZE
@@ -52,7 +53,9 @@ void onCheckSensors();
 void failSafe();
 void onCheckMqtt();
 void onMqttMessage(char* topic, byte* payload, unsigned int length);
+void onSyncClock();
 
+// TODO Get working with public CA certs too.
 
 // Global vars
 #ifdef ENABLE_MDNS
@@ -62,10 +65,10 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length);
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
 #ifdef ENABLE_WEBSERVER
-    // The webserver is initialized with the default port, but if a different port is
-    // loaded from config, then that port is what will be used in initWebserver()
     #warning Enabling the webserver feature poses a security risk. Proceed with caution.
     #include <ESP8266WebServer.h>
+    // The webserver is initialized with the default port, but if a different port is
+    // loaded from config, then that port is what will be used in initWebserver()
     int webServerPort = WEBSERVER_PORT;
     ESP8266WebServer server(webServerPort);
 #endif
@@ -81,6 +84,7 @@ Task tCheckWifi(CHECK_WIFI_INTERVAL, TASK_FOREVER, &onCheckWiFi);
 Task tCheckActivation(ACTIVATION_DURATION, TASK_FOREVER, &onCheckActivation);
 Task tCheckSensors(CHECK_SENSORS_INTERVAL, TASK_FOREVER, &onCheckSensors);
 Task tCheckMqtt(CHECK_MQTT_INTERVAL, TASK_FOREVER, &onCheckMqtt);
+Task tSyncClock(CLOCK_SYNC_INTERVAL, TASK_FOREVER, &onSyncClock);
 Scheduler taskMan;
 String hostName = DEVICE_NAME;
 String ssid = DEFAULT_SSID;
@@ -118,9 +122,33 @@ String deviceStatus() {
         state = "CLOSED";
     }
 
-    Serial.print(F("Door status = "));
+    Serial.print(F("INFO: Door status = "));
     Serial.println(state);
     return state;
+}
+
+/**
+ * Synchronize the local system clock via NTP. Note: This does not take DST
+ * into account. Currently, you will have to adjust the CLOCK_TIMEZONE define
+ * manually to account for DST when needed.
+ */
+void onSyncClock() {
+    configTime(CLOCK_TIMEZONE * 3600, 0, "pool.ntp.org", "time.nist.gov");
+
+    Serial.print("INIT: Waiting for NTP time sync...");
+    delay(500);
+    while (!time(nullptr)) {
+        ESPCrashMonitor.iAmAlive();
+        Serial.print(F("."));
+        delay(500);
+    }
+
+    time_t now = time(nullptr);
+    struct tm *timeinfo = localtime(&now);
+    
+    Serial.println(F(" DONE"));
+    Serial.print(F("INFO: Current time: "));
+    Serial.println(asctime(timeinfo));
 }
 
 /**
@@ -187,8 +215,11 @@ void waitForUserInput() {
 
 /**
  * Gets string input from the serial console.
+ * @param isPassword If true, echos back a '*' instead of the character
+ * that was entered.
+ * @return The string that was entered.
  */
-String getInputString() {
+String getInputString(bool isPassword = false) {
     char c;
     String result = "";
     bool gotEndMarker = false;
@@ -201,7 +232,12 @@ String getInputString() {
                 break;
             }
 
-            Serial.print(c);
+            if (isPassword) {
+                Serial.print('*');
+            }
+            else {
+                Serial.print(c);
+            }
             result += c;
         }
     }
@@ -215,6 +251,12 @@ String getInputString() {
 void printNetworkInfo() {
     Serial.print(F("INFO: Local IP: "));
     Serial.println(WiFi.localIP());
+    Serial.print(F("INFO: Gateway: "));
+    Serial.println(WiFi.gatewayIP());
+    Serial.print(F("INFO: Subnet mask: "));
+    Serial.println(WiFi.subnetMask());
+    Serial.print(F("INFO: DNS server: "));
+    Serial.println(WiFi.dnsIP());
     Serial.print(F("INFO: MAC address: "));
     Serial.println(WiFi.macAddress());
     WiFi.printDiag(Serial);
@@ -252,8 +294,7 @@ void reboot() {
  * Stores the in-memory configuration to a JSON file stored in SPIFFS.
  * If the file does not yet exist, it will be created (see CONFIG_FILE_PATH).
  * Errors will be reported to the serial console if the filesystem is not
- * mounted or if the file could not be opened for writing. Currently only
- * stores network configuration settings (IP, WiFi, etc).
+ * mounted or if the file could not be opened for writing.
  */
 void saveConfiguration() {
     Serial.print(F("INFO: Saving configuration to: "));
@@ -271,6 +312,7 @@ void saveConfiguration() {
     doc["ip"] = ip.toString();
     doc["gateway"] = gw.toString();
     doc["subnetMask"] = sm.toString();
+    doc["dnsServer"] = dns.toString();
     doc["wifiSSID"] = ssid;
     doc["wifiPassword"] = password;
     doc["mqttBroker"] = mqttBroker;
@@ -372,6 +414,10 @@ void loadConfiguration() {
     if (!sm.fromString(doc["subnetMask"].as<String>())) {
         Serial.println(F("WARN: Invalid subnet mask in configuration. Falling back to default."));
     }
+
+    if (!dns.fromString(doc["dnsServer"].as<String>())) {
+        Serial.println(F("WARN: Invalid DSN server in configuration. Falling back to default."));
+    }
     
     ssid = doc["wifiSSID"].as<String>();
     password = doc["wifiPassword"].as<String>();
@@ -418,7 +464,7 @@ bool loadCertificates() {
     File ca = SPIFFS.open(caCertificatePath, "r");
     if (!ca) {
         Serial.println(F("FAIL"));
-        Serial.println(F("ERROR: Could not open client certificate."));
+        Serial.println(F("ERROR: Could not open CA certificate."));
         return false;
     }
 
@@ -475,6 +521,12 @@ bool verifyTLS() {
     // the watchdog to prevent reboot due to watchdog timeout during
     // connection, then re-enable when we are done.
     ESPCrashMonitor.disableWatchdog();
+
+    // Currently, we sync the clock any time we need to verify TLS. This is
+    // because in a future version, this will be required in order to validate
+    // public CA certificates.
+    onSyncClock();
+
     Serial.print(F("INFO: Verifying connectivity over TLS... "));
     bool result = wifiClient.connect(mqttBroker, mqttPort);
     if (result) {
@@ -856,10 +908,10 @@ void connectWifi() {
 
     delay(1000);
     if (isDHCP) {
-        WiFi.config(0U, 0U, 0U);
+        WiFi.config(0U, 0U, 0U, 0U);
     }
     else {
-        WiFi.config(ip, gw, sm);
+        WiFi.config(ip, gw, sm, gw);
     }
 
     Serial.println(F("DEBUG: Beginning connection..."));
@@ -927,8 +979,26 @@ void configureMQTT() {
     Serial.println();
     Serial.print(F("New status channel = "));
     Serial.println(statusChannel);
-    initMQTT();
 
+    Serial.print(F("Current username: "));
+    Serial.println(mqttUsername);
+    Serial.println(F("Enter new username, or just press enter to clear:"));
+    waitForUserInput();
+    mqttPassword = getInputString();
+    Serial.print(F("New MQTT username = "));
+    Serial.println(mqttUsername);
+
+    Serial.print(F("Current password: "));
+    for (uint8_t i = 0; i < mqttPassword.length(); i++) {
+        Serial.print(F("*"));
+    }
+
+    Serial.println();
+    Serial.print(F("Enter new password, or just press enter to clear"));
+    waitForUserInput();
+    mqttPassword = getInputString(true);
+
+    initMQTT();
     Serial.println();
 }
 
@@ -954,6 +1024,12 @@ void configureStaticIP() {
     sm = getIPFromString(getInputString());
     Serial.print(F("New subnet mask: "));
     Serial.println(sm);
+
+    Serial.println(F("Enter DNS server: "));
+    waitForUserInput();
+    dns = getIPFromString(getInputString());
+    Serial.print(F("New DNS server: "));
+    Serial.println(dns);
 
     WiFi.config(ip, gw, sm);  // If actual IP set, then disables DHCP and assumes static.
 }
@@ -1253,11 +1329,13 @@ void initTaskManager() {
     taskMan.addTask(tCheckSensors);
     taskMan.addTask(tCheckWifi);
     taskMan.addTask(tCheckMqtt);
+    taskMan.addTask(tSyncClock);
     
     tCheckWifi.enableDelayed(30000);
     tCheckSensors.enable();
     tCheckActivation.enable();
     tCheckMqtt.enableDelayed(1000);
+    tSyncClock.enable();
     Serial.println(F("DONE"));
 }
 
@@ -1286,7 +1364,6 @@ void onCheckActivation() {
         Serial.print(F("INFO: Deactivating door @ "));
         Serial.println(millis());
         garageDoorRelay.open();
-
     }
 }
 

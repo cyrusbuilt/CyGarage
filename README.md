@@ -25,9 +25,11 @@ The config.h file contains default configuration directives. These options are t
 - DEFAULT_SSID: Change this line to reflect the SSID of your WiFi network.
 - DEFAULT_PASSWORD: Change this line to reflect the password to your WiFi network.
 - WEBSERVER_PORT: If you wish to use a port number other than the standard HTTP port, you can change that here. This option is ignored if ENABLE_WEBSERVER is disabled.
+- CLOCK_TIMEZONE: The GMT offset for your timezone (EST [America/New York] is -4 when observing DST. It's -5 when not.)
 - SERIAL_BAUD: While it is not recommended, you can change the BAUD rate of the serial port here.
 - CHECK_WIFI_INTERVAL: The interval (in milliseconds) to check to make sure the device is still connected to WiFi, and if not attempt to reconnect. Default is 30 seconds.
 - CHECK_SENSORS_INTERVAL: The interval (in millisceonds) to check the door contact sensors to determine door state. Default is 3 seconds.
+- CLOCK_SYNC_INTERVAL: The interval (in milliseconds) to try to resync the clock with NTP. Default is 1 hour.
 - ACTIVATION_DURATION: The amount of time (in milliseconds) to activate the door relay. Default is 2.5 seconds and is recommended this value not be changed unless you have good reason for doing so.
 - DEVICE_NAME: This essentially serves as the host name of the device on the network.
 - CHECK_MQTT_INTERVAL: The interval (in milliseconds) to check connectivity to the MQTT broker. If the connection is lost, a reconnect will occur. The default value is 35 seconds.
