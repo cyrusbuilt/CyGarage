@@ -32,7 +32,7 @@
 #define SERIAL_BAUD 115200                      // The BAUD rate (speed) of the serial port (console).
 #define CHECK_WIFI_INTERVAL 30000               // How often to check WiFi status (milliseconds).
 #define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
-#define CLOCK_SYNC_INTERVAL 3600000             // How often to sync the local clock with NTP.
+#define CLOCK_SYNC_INTERVAL 3600000             // How often to sync the local clock with NTP (milliseconds).
 #define ACTIVATION_DURATION 2500                // How long the activation relay should be on.
 #define DEVICE_NAME "CYGARAGE"                  // The device name.
 #define CHECK_MQTT_INTERVAL 35000               // MQTT connectivity check interval (milliseconds).
