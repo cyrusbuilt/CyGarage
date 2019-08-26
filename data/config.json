@@ -4,6 +4,7 @@
     "ip": "192.168.0.200",
     "gateway": "192.168.0.1",
     "subnetMask": "255.255.255.0",
+    "dnsServer": "192.168.0.1",
     "wifiSSID": "your_ssid_here",
     "wifiPassword": "your_wifi_password_here",
     "webserverPort": 80,
