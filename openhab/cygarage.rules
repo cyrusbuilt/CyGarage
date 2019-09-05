@@ -22,10 +22,10 @@ rule "CyGarageActions"
 when
     Item CyGarageAction received command
 then
-    val String cmd = CyGarageAction.state.toString()
+    val String cmd = receivedCommand.toString()
     logInfo(fileName, "Got action: " + cmd)
 
-    var String cmdString = "{\"client_id\":\"cygarage\",\"command\":" + cmd + "}"
+    val String cmdString = "{\"client_id\":\"cygarage\",\"command\":" + cmd + "}"
     
     logInfo(fileName, "Publishing MQTT payload " + cmdString + " to channel: " + controlChannel)
     actionsBroker.publishMQTT(controlChannel, cmdString)
@@ -43,8 +43,9 @@ then
         logInfo(fileName, "Garage door is OPEN or AJAR!")
         if (statusTimer === null) {
             statusTimer = createTimer(now.plusMinutes(notifyDelay), [|
-                logInfo(fileName, "Garage door has been left AJAR or OPEN for 15 minutes!")
-                sendBroadcastNotification("Garage door has been left AJAR or OPEN for 15 minutes!")
+                val String alertMessage = "Garage door has been left AJAR or OPEN for 15 minutes!"
+                logInfo(fileName, alertMessage)
+                sendBroadcastNotification(alertMessage)
             ])
         }
         else {

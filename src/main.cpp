@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v1.5
+ * CyGarage v1.6
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -1031,7 +1031,7 @@ void configureStaticIP() {
     Serial.print(F("New DNS server: "));
     Serial.println(dns);
 
-    WiFi.config(ip, gw, sm);  // If actual IP set, then disables DHCP and assumes static.
+    WiFi.config(ip, gw, sm, dns);  // If actual IP set, then disables DHCP and assumes static.
 }
 
 /**
@@ -1095,7 +1095,7 @@ void checkCommand() {
             else {
                 isDHCP = true;
                 Serial.println(F("INFO: Set DHCP mode."));
-                WiFi.config(0U, 0U, 0U);
+                WiFi.config(0U, 0U, 0U, 0U);
             }
             promptConfig();
             checkCommand();
