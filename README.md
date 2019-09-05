@@ -72,6 +72,8 @@ This configuration file is pretty self explanatory and one is included in the so
 
 - mqttUsername: If you have enabled password authentication on your MQTT broker, provide the username here.
 - mqttPassword: If you have enabled password authentication on your MQTT broker, provide the password for the username above. If *both* the username and password are provided, then CyGarage will attempt to connect to the broker with the provided credentials; Otherwise, it will attempt to connect without credentials.
+- mqttControlChannel: The MQTT control topic to subscribe to in order to receive device commands.
+- mqttStatusChannel: The MQTT status topic to publish device status to.
 - serverFingerprintPath: The path to the file containing the MQTT broker's SHA256 fingerprint. Default is '/mqtt.fpn'.
 - caCertificatePath: The path to the CA certificate that the MQTT broker's certificate was signed with. Default is '/ca.crt'.
 
