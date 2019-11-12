@@ -4,7 +4,7 @@
 *eMail=
 *
 *Project=CyGarage
-*Date=15:41:06
+*Date=15:44:04
 *CreatedBy=Fritzing 0.9.3b.04.19.5c895d327c44a3114e5fcc9d8260daf0cbb52806
 *
 *
@@ -13,28 +13,30 @@
 *Rotation in degree (0-360, math. pos.)
 *
 *No;Value;Package;X;Y;Rotation;Side;Name
-1;;THT;80.1728;-10.1063;90;Bottom;J1
-2;;300 mil [THT];66.5559;-22.0188;-90;Bottom;D1
-3;;;89.4158;-2.99428;0;Bottom;Hole2
-4;;5 mm [THT];76.7158;-54.4852;0;Bottom;LED2
-5;;;80.2362;-5.31911;0;Bottom;TXT2
-6;;THT;59.8528;-10.1063;90;Bottom;J3
-7;;300 mil [THT];58.9359;-22.0188;-90;Bottom;D2
-8;;;59.5186;-5.15513;0;Bottom;TXT4
-9;;;84.8827;-50.7223;0;Bottom;TXT7
-10;;;84.8761;-38.1496;0;Bottom;TXT6
-11;330;THT;58.9359;-38.5542;-90;Bottom;R2
-12;;;42.3392;-38.5729;90;Bottom;HUZZAH ESP8266 Breakout
-13;;;42.0496;-14.4782;0;Bottom;TXT8
-14;;;3.05589;-2.99428;0;Bottom;Hole4
-15;;;80.522;-3.38302;0;Bottom;TXT3
-16;;;42.4223;-12.953;0;Bottom;TXT9
-17;;;3.05589;-58.8742;0;Bottom;Hole3
-18;;;89.4158;-58.8742;0;Bottom;Hole1
-19;;;67.3802;-5.17652;0;Bottom;TXT5
-20;;;42.122;-16.4851;0;Bottom;TXT1
-21;;5 mm [THT];76.7158;-41.7852;0;Bottom;LED1
-22;330;THT;66.5559;-38.5542;-90;Bottom;R1
-23;;;15.7559;-32.2042;90;Bottom;Power Relay Feather Wing
-24;;;41.7894;-7.61557;0;Bottom;IMG1
-25;;THT;67.4728;-10.1063;90;Bottom;J2
+1;;;89.3103;-2.78336;0;Bottom;Hole2
+2;;THT;67.3674;-9.89538;90;Bottom;J2
+3;;;80.4165;-3.1721;0;Bottom;TXT3
+4;;;84.7772;-50.5114;0;Bottom;TXT7
+5;;300 mil [THT];66.4504;-21.8079;-90;Bottom;D1
+6;;;80.1307;-5.10819;0;Bottom;TXT2
+7;;5 mm [THT];76.6103;-54.2743;0;Bottom;LED2
+8;;;2.95043;-2.78336;0;Bottom;Hole4
+9;;;15.6504;-31.9933;90;Bottom;Power Relay Feather Wing
+10;;;90.6237;-20.5588;-90;Bottom;TXT10
+11;;THT;59.7474;-9.89538;90;Bottom;J3
+12;330;THT;66.4504;-38.3433;-90;Bottom;R1
+13;;;84.7706;-37.9387;0;Bottom;TXT6
+14;;;89.3103;-58.6633;0;Bottom;Hole1
+15;;;46.7135;-1.36921;0;Bottom;TXT11
+16;;5 mm [THT];76.6103;-41.5743;0;Bottom;LED1
+17;;;42.2337;-38.362;90;Bottom;HUZZAH ESP8266
+18;;;67.2748;-4.96561;0;Bottom;TXT5
+19;;;42.122;-17.2233;0;Bottom;TXT1
+20;;;41.473;-7.72103;0;Bottom;IMG1
+21;;;59.4132;-4.94422;0;Bottom;TXT4
+22;;THT;80.0674;-9.89538;90;Bottom;J1
+23;;;42.1059;-13.2693;0;Bottom;TXT9
+24;;300 mil [THT];58.8304;-21.8079;-90;Bottom;D2
+25;330;THT;58.8304;-38.3433;-90;Bottom;R2
+26;;;42.0496;-15.0055;0;Bottom;TXT8
+27;;;2.95043;-58.6633;0;Bottom;Hole3

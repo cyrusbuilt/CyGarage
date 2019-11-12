@@ -21,3 +21,6 @@ certs/
 *.pem
 *.fpn
 *.crt
+
+# Mac stuff
+.DS_Store
