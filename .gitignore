@@ -24,3 +24,6 @@ certs/
 
 # Mac stuff
 .DS_Store
+
+# gerber files
+gerber.zip
