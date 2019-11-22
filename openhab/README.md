@@ -124,21 +124,25 @@ Next we need to copy the following files to the openhab-conf folder on the serve
 
 This is a "Thing" definition for the MQTT bridge. This bridge can be used by anything else in OH2 that needs it. This simply defines a bridge to MQTT that registers OH2 as a client. If a Thing definition for this bridge already exists, no need to copy it again. If not, then copy this file to the openhab-conf/things directory.
 
-## cygarage.things
+## model1/cygarage.things
 
 This is a "Thing" definition for CyGarage that binds the channels we need to MQTT.  You can edit the binding if needed, (such as adding the mosquitto username and password, hostname or IP and port) then copy this file to the openhab-conf/things directory.
 
-## cygarage.items
+## model1/cygarage.items
 
 This file defines the items that will bind to the channels in the cygarage.things file, which will represent controls and display values. Copy this file to your openhab-conf/items folder.
 
-## cygarage.sitemap
+## model1/cygarage.sitemap
 
 This is the sitemap contains all the items defined in the cygarage.items file and makes up all the monitor and control items on one screen. Copy this file to your openhab-conf/sitemaps folder.
 
-## cygarage.rules
+## model1/cygarage.rules
 
 Contains automation logic. This file is responsible for sending push notifications if the door is open/ajar for 15 minutes or longer and handles the control actions. Copy this file to your openhab-conf/rules folder.
+
+## model2/*
+
+The same files as above, but to for the Model 2 (2 door version).
 
 ## All set
 

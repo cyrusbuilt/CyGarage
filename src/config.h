@@ -17,15 +17,22 @@
 #include <IPAddress.h>
 
 // Configuration
+#define CG_MODEL_2                              // Comment this line to revert to Model 1 (single door) firmware.
 #define ENABLE_OTA                              // Comment this line to disable OTA updates.
 #define ENABLE_MDNS                             // Comment this line to disable the MDNS.
 // The following option is disabled by default for security reasons. If you need basic unencrypted HTTP
 // functionality (particularly if you are using CyGarageMobile v1.0), then uncomment the following line.
+// /**
+//  * @deprecated Will be removed in a future version.
+//  */
 //#define ENABLE_WEBSERVER                        // Comment this line to disable the embedded web server.
 #define CONFIG_FILE_PATH "/config.json"         // The config file path. Do not alter unless you are sure.
 #define DEFAULT_SSID "your_ssid_here"           // Put the SSID of your WiFi here.
 #define DEFAULT_PASSWORD "your_wifi_password"   // Put your WiFi password here.
 #ifdef ENABLE_WEBSERVER
+    /**
+     * @deprecated Will be removed in a future version.
+     */
     #define WEBSERVER_PORT 80                   // The built-in webserver port.
 #endif
 #define CLOCK_TIMEZONE -4                       // The timezone this device is located in. (For example, EST when observing DST = GMT-4, when not = GMT-5)

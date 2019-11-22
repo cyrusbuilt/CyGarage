@@ -1,0 +1,65 @@
+
+var Timer statusTimer = null
+val String fileName = "cygarage.rules"
+val String controlChannel = "cygarage/control"
+val int notifyDelay = 15
+val actionsBroker = getActions("mqtt", "mqtt:broker:mosquitto")
+
+// NOTE: Commands taken from TelemetryHelper.h
+
+rule "CyGarageRecCmdON"
+when
+    Item CyGarage received command
+then
+    logInfo(fileName, "Garage door received command: " + receivedCommand)
+    if (receivedCommand === ON) {
+        val String ctrlMsg = "{\"client_id\":\"cygarage\",\"command\":2}"
+        logInfo(fileName, "Publishing MQTT payload " + ctrlMsg + " to channel: " + controlChannel)
+        actionsBroker.publishMQTT(controlChannel, ctrlMsg)
+        CyGarage.postUpdate(NULL)
+    }
+end
+
+rule "CyGarageActions"
+when
+    Item CyGarageAction received command
+then
+    val String cmd = receivedCommand.toString()
+    logInfo(fileName, "Got action: " + cmd)
+
+    val String cmdString = "{\"client_id\":\"cygarage\",\"command\":" + cmd + "}"
+    
+    logInfo(fileName, "Publishing MQTT payload " + cmdString + " to channel: " + controlChannel)
+    actionsBroker.publishMQTT(controlChannel, cmdString)
+    CyGarageAction.postUpdate(NULL)
+end
+
+rule "CyGarageOPEN_AJAR_15"
+when
+    System started or Item CyGarageStatus changed
+then
+    // If not closed and we haven't already started the timer,
+    // then start a new one and alert in 15 min if the door is
+    // still open. Otherwise, kill any existing timer. 
+    if (CyGarageStatus.state != "CLOSED") {
+        logInfo(fileName, "Garage door is OPEN or AJAR!")
+        if (statusTimer === null) {
+            statusTimer = createTimer(now.plusMinutes(notifyDelay), [|
+                val String alertMessage = "Garage door has been left AJAR or OPEN for 15 minutes!"
+                logInfo(fileName, alertMessage)
+                sendBroadcastNotification(alertMessage)
+            ])
+        }
+        else {
+            logInfo(fileName, "Status Timer rescheduled")
+            statusTimer.reschedule(now.plusMinutes(notifyDelay))
+        }
+    }
+    else {
+        logInfo(fileName, "Garage door is CLOSED.")
+        if (statusTimer !== null) {
+            statusTimer.cancel()
+            statusTimer = null
+        }
+    }
+end

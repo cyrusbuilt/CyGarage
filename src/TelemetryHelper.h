@@ -59,6 +59,13 @@ enum class ControlCommand: uint8_t {
      * the MQTT status topic.
      */
     REQUEST_STATUS = 4
+
+    #ifdef CG_MODEL_2
+    /**
+     * Activates door 2.
+     */
+    ,ACTIVATE_2 = 5
+    #endif
 };
 
 /**
