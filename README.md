@@ -18,6 +18,7 @@ The way this is intended to work is: when the device detects that the door is op
 
 The config.h file contains default configuration directives. These options are the hardcoded default values that the system will initially boot with. However, if there is a config.json file present in the root of the SPIFFS file system, then it will override these defaults. Here we'll discuss each option:
 
+- CG_MODEL_2: Comment this line if you are building the firmware for the Model 1 (single door version). By default, this firmare supports Model 2.
 - ENABLE_OTA: If you do not wish to support OTA updates, just comment this define.
 - ENABLE_MDNS: If you do not wish to support [MDNS](https://tttapa.github.io/ESP8266/Chap08%20-%20mDNS.html), comment this define.
 - ENABLE_WEBSERVER: This option is disabled by default for security reasons. Only uncomment this line if you know what you are doing or if you absolutely need it for backward compatibility with older versions of CyGarageMobile.
@@ -104,7 +105,7 @@ Now all you have to do is flash the firmware onto the Huzzah. You can do this by
 
 Once complete, press the "reset" button on the Huzzah. You should see the device boot up in the serial console. Now put the device back into flash mode. If you are using MQTT over TLS (recommended) then visit the readme in the "openhab" folder (even if you ultimately are not connecting MQTT to OpenHAB) for instructions on generating the necessary files for connecting CyGarage to MQTT, otherwise just click the "Upload File System Image" task in the PlatformIO menu. When finished, press the "reset" button again and the device will reboot and come back up with your new configuration settings.
 
-## Webserver Routes
+## Webserver Routes (Deprecated)
 
 These routes are *ONLY* exposed if the ENABLE_WEBSERVER directive is uncommented.
 
@@ -140,7 +141,9 @@ If the device ever fails to connect to WiFi or if you press the 'I' key on your 
 
 - Get network info - Press 'g'. This will dump network information to the serial console (IP config, WiFi connection info).
 
-- Activiate door - Press 'a'. This allows the user to manually activate the door.
+- Activate door (1) - Press 'a'. This allows the user to manually activate the door. Activates door 1 on Model 2.
+
+- Activate door 2 - Press 'b'. This allows the user to manually activate door 2. Not present on Model 1 firmware.
 
 - Save config changes - Press 'f'. This will save any configuration changes currently stored in memory to config.json.
 
@@ -176,6 +179,10 @@ If you choose not to integrate with OpenHAB2, you can get similar functionality 
 
 Once the board is assembled (either by having the board etched or by just soldering the necessary components to perf board and making the connections manually), you will need to mount the board somewhere and then make the necessary connections to the opener. If using door contacts is not an option for you (which was the case for me), it is possible to use the limit switches already mounted to the track to tell the motor to stop when the door is all the way open or all the way closed. Many garage door openers have voltage present on these limit switches. In the case of my Genie, there was 7.7V DC present when the limit switches were open, which then goes to 0V when the switches closed. We can't have that voltage (or current) being fed back in to the inputs on the ESP8266, so rectifier diodes (D1 and D2) were added to the circuit just before J2 and J3 (respectively). This allows us to use the existing switches, but still isolate the ESP8266 from the garage door opener's voltage and prevent ground loops. That being said, the first thing to do is to locate the terminals on the garage door opener that the wall-mounted push button wires to.
 
-*MOST* garage door openers have a button mounted near the interior door that you can press to open/close the garage door. Follow the wires from that button and see which terminals they wire into on the opener. You need to connect 2 wires to the COM and NO screw terminals on the Power Relay Featherwing (I ran appropriate lengths of 18/2 (18 Guage / 2 lead) for all my connections and mounted the CyGarage board on the wall where I could easily get to it). Next, connect 2 wires each to J2 and J3 and then connect the other ends of each to either magnetic door contacts or the limit switches mounted on the trolley track.  If connecting to the limit switches, it is important to be sure that you are connecting the outside terminals (think of these as the negative or ground terminals) to the frame or ground on the track itself and the inside terminals (think of these as the positive terminals) to the switch leads themselves.
+*MOST* garage door openers have a button mounted near the interior door that you can press to open/close the garage door. Follow the wires from that button and see which terminals they wire into on the opener. You need to connect 2 wires from the push button terminals on the opener to the COM and NO screw terminals on the Power Relay FeatherWing (I ran appropriate lengths of 18/2 (18 Guage / 2 lead) for all my connections and mounted the CyGarage board on the wall where I could easily get to it). Next, connect 2 wires each to J2 and J3 and then connect the other ends of each to either magnetic door contacts or the limit switches mounted on the trolley track.  If connecting to the limit switches, it is important to be sure that you are connecting the outside terminals (think of these as the negative or ground terminals) to the frame or ground on the track itself and the inside terminals (think of these as the positive terminals) to the switch leads themselves.
 
 Last, you need to connect a 5VDC 1A power supply to J1. I personally used a power adapter for an old USB hub I still had laying around. But a lot of cell phone chargers and the like would work too, or the 5VDC rail from an old PC power supply, or you could build one, which wouldn't be that difficult. If you intend to mount the board somewhere that will be difficult to hook up to a computer later, it would be best to make sure you flash the ESP8266 with the firmware first. Since mine was mounted on the wall near one of my benches, I just set my laptop on the bench and connect the USB-to-Serial cable and flash it right there (when necessary, I mostly just use the OTA feature). I would HIGHLY recommend that you use female headers to create a sort of 'socket' for the Huzzah. That way it can be replaced if something happens or so you can pop it out and flash it if needed.
+
+For Model 2:
+
+The same as above except J3 and J4 connect to door contacts or limit switches on door 2, and relay 2 connects to the push button terminals on the opener for door 2.

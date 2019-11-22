@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v1.6
+ * CyGarage v1.7
  * 
  * (c) 2019, Cyrus Brunner
  * 
@@ -27,10 +27,10 @@
 #include "ESPCrashMonitor-master/ESPCrashMonitor.h"
 #include "ArduinoJson.h"
 #include "PubSubClient.h"
-#include "TelemetryHelper.h"
 #include "config.h"
+#include "TelemetryHelper.h"
 
-#define FIRMWARE_VERSION "1.5"
+#define FIRMWARE_VERSION "1.7"
 
 // Workaround to allow an MQTT packet size greater than the default of 128.
 #ifdef MQTT_MAX_PACKET_SIZE
@@ -44,6 +44,11 @@
 #define PIN_ACTIVATE 4
 #define PIN_OPEN_SENSOR 12
 #define PIN_CLOSE_SENSOR 13
+#ifdef CG_MODEL_2
+    #define PIN_OPEN_SENSOR_2 14
+    #define PIN_CLOSE_SENSOR_2 16
+    #define PIN_ACTIVATE_2 5
+#endif
 
 // Forward declarations
 void onRelayStateChange(RelayInfo* sender);
@@ -66,6 +71,7 @@ WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
 #ifdef ENABLE_WEBSERVER
     #warning Enabling the webserver feature poses a security risk. Proceed with caution.
+    #warning Webserver feature is deprecated and will be removed in a future version.
     #include <ESP8266WebServer.h>
     // The webserver is initialized with the default port, but if a different port is
     // loaded from config, then that port is what will be used in initWebserver()
@@ -78,6 +84,11 @@ PubSubClient mqttClient(wifiClient);
 DoorContact openSensor(PIN_OPEN_SENSOR, NULL);
 DoorContact closeSensor(PIN_CLOSE_SENSOR, NULL);
 Relay garageDoorRelay(PIN_ACTIVATE, onRelayStateChange, "GARAGE_DOOR");
+#ifdef CG_MODEL_2
+    DoorContact openSensor2(PIN_OPEN_SENSOR_2, NULL);
+    DoorContact closeSensor2(PIN_CLOSE_SENSOR_2, NULL);
+    Relay garageDoorRelay2(PIN_ACTIVATE_2, NULL, "GARAGE_DOOR_2");
+#endif
 LED sensorLED(PIN_SENSOR_LED, NULL);
 LED wifiLED(PIN_WIFI_LED, NULL);
 Task tCheckWifi(CHECK_WIFI_INTERVAL, TASK_FOREVER, &onCheckWiFi);
@@ -96,6 +107,9 @@ String serverFingerprintPath;
 String caCertificatePath;
 String fingerprintString;
 String lastState = "";
+#ifdef CG_MODEL_2
+    String lastState2 = "";
+#endif
 String mqttUsername = "";
 String mqttPassword = "";
 int mqttPort = MQTT_PORT;
@@ -126,6 +140,22 @@ String deviceStatus() {
     Serial.println(state);
     return state;
 }
+
+#ifdef CG_MODEL_2
+String deviceStatus2() {
+    String state = "AJAR";
+    if (openSensor2.isOpen()) {
+        state = "OPEN";
+    }
+    else if (closeSensor2.isOpen()) {
+        state = "CLOSED";
+    }
+
+    Serial.print(F("INFO: Door status = "));
+    Serial.println(state);
+    return state;
+}
+#endif
 
 /**
  * Synchronize the local system clock via NTP. Note: This does not take DST
@@ -161,7 +191,12 @@ void publishSystemState() {
 
         DynamicJsonDocument doc(200);
         doc["client_id"] = hostName;
-        doc["state"] = deviceStatus();
+        #ifdef CG_MODEL_2
+            doc["door1State"] = deviceStatus();
+            doc["door2State"] = deviceStatus2();
+        #else
+            doc["doorState"] = deviceStatus();
+        #endif
         doc["firmwareVersion"] = FIRMWARE_VERSION;
         doc["systemState"] = (uint8_t)sysState;
 
@@ -656,6 +691,7 @@ void onCheckMqtt() {
 /**
  * Gets the device status and sends it via HTTP to connected clients.
  * Blinks the WiFi LED to indicate activity.
+ * @deprecated Will be removed in a future version.
  */
 void getDeviceStatus() {
     #ifdef ENABLE_WEBSERVER
@@ -668,6 +704,7 @@ void getDeviceStatus() {
 /**
  * Gets the firmware version and sends it via HTTP to connected clients.
  * Blinks the WiFi LED to indicate activity.
+ * @deprecated Will be removed in a future version.
  */
 void getFirmwareVersion() {
     #ifdef ENABLE_WEBSERVER
@@ -680,6 +717,7 @@ void getFirmwareVersion() {
 /**
  * Sends "Server OK" to connected clients over HTTP and blinks WiFi LED to
  * indicate activity.
+ * @deprecated Will be removed in a future version.
  */
 void serverOk() {
     #ifdef ENABLE_WEBSERVER
@@ -694,16 +732,34 @@ void serverOk() {
  * blinks WiFi LED to indicate activity.
  */
 void activateDoor() {
-    Serial.print(F("INFO: Activating door @ "));
+    Serial.print(F("INFO: Activating door "));
+    #ifdef CG_MODEL_2
+        Serial.print(F(" 1 "));
+    #endif
+    Serial.print(F("@ "));
     Serial.println(millis());
-    garageDoorRelay.close();
     wifiLED.on();
+    garageDoorRelay.close();
     #ifdef ENABLE_WEBSERVER
         server.send(200, "text/plain", "OK");
     #endif
     publishSystemState();
     wifiLED.off();
 }
+
+#ifdef CG_MODEL_2
+void activateDoor2() {
+    Serial.print(F("INFO: Activating door 2 @ "));
+    Serial.println(millis());
+    wifiLED.on();
+    garageDoorRelay2.close();
+    #ifdef ENABLE_WEBSERVER
+        server.send(200, "text/plain", "OK");
+    #endif
+    publishSystemState();
+    wifiLED.off();
+}
+#endif
 
 /**
  * Processes control requests. Executes the specified command
@@ -731,6 +787,11 @@ void handleControlRequest(String id, ControlCommand cmd) {
         case ControlCommand::ACTIVATE:
             activateDoor();
             break;
+        #ifdef CG_MODEL_2
+        case ControlCommand::ACTIVATE_2:
+            activateDoor2();
+            break;
+        #endif
         case ControlCommand::DISABLE:
             Serial.println(F("WARN: Disabling system."));
             sysState = SystemState::DISABLED;
@@ -836,6 +897,7 @@ void initFilesystem() {
 
 /**
  * Initializes the built-in web server.
+ * @deprecated Will be removed in a future release.
  */
 void initWebServer() {
     #ifdef ENABLE_WEBSERVER
@@ -885,13 +947,19 @@ void promptConfig() {
     Serial.println(F("= w: Reconnect to WiFi       ="));
     Serial.println(F("= e: Resume normal operation ="));
     Serial.println(F("= g: Get network info        ="));
-    Serial.println(F("= a: Activate door           ="));
+    Serial.print(F("= a: Activate door "));
+    #ifdef CG_MODEL_2
+        Serial.println(F("1         ="));
+        Serial.println(F("= b: Activate door 2        ="));
+    #else
+        Serial.println(F("          ="));
+    #endif
     Serial.println(F("= f: Save config changes     ="));
     Serial.println(F("= z: Restore default config  ="));
     Serial.println(F("=                            ="));
     Serial.println(F("=============================="));
     Serial.println();
-    Serial.println(F("Enter command choice (r/c/s/n/w/e/g): "));
+    Serial.println(F("Enter command choice (r/c/m/s/n/w/e/g/a/f/z): "));
     waitForUserInput();
 }
 
@@ -1142,6 +1210,15 @@ void checkCommand() {
             promptConfig();
             checkCommand();
             break;
+        #ifdef CG_MODEL_2
+        case 'b':
+            activateDoor2();
+            delay(1000);
+            garageDoorRelay2.open();
+            promptConfig();
+            checkCommand();
+            break;
+        #endif
         case 'f':
             // Save configuration changes and restart services.
             saveConfiguration();
@@ -1185,6 +1262,9 @@ void failSafe() {
     sensorLED.on();
     wifiLED.on();
     garageDoorRelay.open();
+    #ifdef CG_MODEL_2
+        garageDoorRelay2.open();
+    #endif
     promptConfig();
     checkCommand();
 }
@@ -1298,6 +1378,10 @@ void initInputs() {
     Serial.print(F("INIT: Initializing sensors... "));
     openSensor.init();
     closeSensor.init();
+    #ifdef CG_MODEL_2
+        openSensor2.init();
+        closeSensor2.init();
+    #endif
     Serial.println(F("DONE"));
 }
 
@@ -1314,6 +1398,12 @@ void initOutputs() {
 
     garageDoorRelay.init();
     garageDoorRelay.open();
+
+    #ifdef CG_MODEL_2
+        garageDoorRelay2.init();
+        garageDoorRelay2.open();
+    #endif
+
     delay(1000);
     Serial.println(F("DONE"));
 }
@@ -1361,10 +1451,22 @@ void onCheckWiFi() {
  */
 void onCheckActivation() {
     if (garageDoorRelay.isClosed()) {
-        Serial.print(F("INFO: Deactivating door @ "));
+        Serial.print(F("INFO: Deactivating door "));
+        #ifdef CG_MODEL_2
+            Serial.print(F("1 "));
+        #endif
+        Serial.print(F("@ "));
         Serial.println(millis());
         garageDoorRelay.open();
     }
+
+    #ifdef CG_MODEL_2
+        if (garageDoorRelay2.isClosed()) {
+            Serial.print(F("INFO: Deactivating door 2 @ "));
+            Serial.println(millis());
+            garageDoorRelay2.open();
+        }
+    #endif
 }
 
 /**
@@ -1386,6 +1488,23 @@ void onCheckSensors() {
         lastState = state;
         publishSystemState();
     }
+
+    #ifdef CG_MODEL_2
+        String state2 = deviceStatus2();
+        if (state2 == "AJAR" || state == "OPEN") {
+            if (sensorLED.isOff()) {
+                sensorLED.on();
+            }
+        }
+        else {
+            sensorLED.off();
+        }
+
+        if (!lastState2.equals(state2)) {
+            lastState2 = state2;
+            publishSystemState();
+        }
+    #endif
 }
 
 void onRelayStateChange(RelayInfo* sender) {

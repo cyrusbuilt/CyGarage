@@ -1,0 +1,62 @@
+*Pick And Place List
+*Company=
+*Author=
+*eMail=
+*
+*Project=CyGarage-Model2
+*Date=10:57:45
+*CreatedBy=Fritzing 0.9.3b.04.19.5c895d327c44a3114e5fcc9d8260daf0cbb52806
+*
+*
+*Coordinates in mm, always center of component
+*Origin 0/0=Lower left corner of PCB
+*Rotation in degree (0-360, math. pos.)
+*
+*No;Value;Package;X;Y;Rotation;Side;Name
+1;;;7.26393;-17.2467;0;Bottom;TXT3
+2;;THT;3.01631;-19.8155;-180;Bottom;J5
+3;;;7.67494;-32.2421;0;Bottom;TXT22
+4;;;43.3951;-50.3997;0;Bottom;Via8
+5;;;3.52431;-2.9525;0;Bottom;Hole4
+6;330;THT;34.0043;-58.8325;90;Bottom;R1
+7;;THT;3.01631;-27.4355;180;Bottom;J4
+8;330;THT;34.0043;-10.5725;-90;Bottom;R4
+9;;300 mil [THT];17.4689;-53.7525;0;Bottom;D1
+10;330;THT;34.0043;-41.0525;90;Bottom;R2
+11;;;35.3095;-2.73934;0;Bottom;TXT18
+12;;;62.9023;-33.3309;0;Bottom;Via6
+13;;;7.68863;-39.762;0;Bottom;TXT21
+14;;300 mil [THT];17.4689;-35.9725;0;Bottom;D3
+15;;5 mm [THT];64.4843;-11.2635;0;Bottom;LED1
+16;;THT;3.01631;-50.2955;180;Bottom;J1
+17;;;7.26393;-21.8744;0;Bottom;TXT4
+18;;;103.189;-6.51236;0;Bottom;TXT16
+19;;;69.5643;-66.4525;0;Bottom;Hole6
+20;;;49.4683;-7.08372;0;Bottom;TXT2
+21;;;7.6236;-47.3041;0;Bottom;TXT20
+22;;300 mil [THT];17.4689;-25.8125;0;Bottom;D4
+23;;THT;3.01631;-35.0555;180;Bottom;J3
+24;;;3.75979;-14.952;0;Bottom;TXT5
+25;;;69.5643;-2.9525;0;Bottom;Hole5
+26;;THT;3.01631;-42.6755;180;Bottom;J2
+27;;;64.1215;-24.1869;0;Bottom;Via7
+28;;;72.6559;-19.3101;0;Bottom;Via4
+29;;;102.674;-4.57238;0;Bottom;TXT17
+30;;;3.52431;-66.4525;0;Bottom;Hole3
+31;;;130.963;-34.6096;-90;Bottom;TXT19
+32;;;53.7583;-15.6525;0;Bottom;Via1
+33;;5 mm [THT];49.2443;-11.2635;0;Bottom;LED2
+34;;;56.8643;-41.0294;180;Bottom;Huzzah ESP8266
+35;330;THT;34.0043;-25.8125;90;Bottom;R3
+36;;;130.524;-66.4525;0;Bottom;Hole2
+37;;;89.8843;-37.2425;-90;Bottom;Relay1
+38;;;130.524;-2.9525;0;Bottom;Hole1
+39;;;64.9769;-7.01253;0;Bottom;TXT1
+40;;;115.284;-37.2425;-90;Bottom;Relay2
+41;;;50.1007;-29.0637;0;Bottom;Via2
+42;;300 mil [THT];17.4689;-43.5925;0;Bottom;D2
+43;;;56.1967;-13.2141;0;Bottom;Via5
+44;;;65.3407;-21.7485;0;Bottom;Via3
+45;;;102.774;-8.85097;0;Bottom;TXT15
+46;;;123.803;-7.153;0;Bottom;IMG3
+47;;;7.67152;-24.4596;0;Bottom;TXT23

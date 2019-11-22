@@ -1,0 +1,8 @@
+Thing mqtt:topic:mosquitto:cygarage "MQTT Thing CyGarage" (mqtt:broker:mosquitto) @ "CyGarage" {
+    Channels:
+        Type switch : Activator1 [commandTopic="cygarage/control"]
+        Type string : DoorState [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.doorState"]
+        Type string : Version [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.firmwareVersion"]
+        Type number : SysState [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.systemState"]
+        Type string : SysID [stateTopic="cygarage/status", transformationPattern="JSONPATH:$.client_id"]
+}

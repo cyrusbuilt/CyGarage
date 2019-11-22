@@ -5,16 +5,31 @@ val String controlChannel = "cygarage/control"
 val int notifyDelay = 15
 val actionsBroker = getActions("mqtt", "mqtt:broker:mosquitto")
 
+// NOTE: Commands taken from TelemetryHelper.h
+
 rule "CyGarageRecCmdON"
 when
-    Item CyGarage received command
+    Item CyGarage1 received command
 then
-    logInfo(fileName, "Garage door received command: " + receivedCommand)
+    logInfo(fileName, "Garage door 1 received command: " + receivedCommand)
     if (receivedCommand === ON) {
         val String ctrlMsg = "{\"client_id\":\"cygarage\",\"command\":2}"
         logInfo(fileName, "Publishing MQTT payload " + ctrlMsg + " to channel: " + controlChannel)
         actionsBroker.publishMQTT(controlChannel, ctrlMsg)
-        CyGarage.postUpdate(NULL)
+        CyGarage1.postUpdate(NULL)
+    }
+end
+
+rule "CyGarageRecCmdON"
+when
+    Item CyGarage2 received command
+then
+    logInfo(fileName, "Garage door 2 received command: " + receivedCommand)
+    if (receivedCommand === ON) {
+        val String ctrlMsg = "{\"client_id\":\"cygarage\",\"command\":5}"
+        logInfo(fileName, "Publishing MQTT payload " + ctrlMsg + " to channel: " + controlChannel)
+        actionsBroker.publishMQTT(controlChannel, ctrlMsg)
+        CyGarage2.postUpdate(NULL)
     }
 end
 
@@ -34,12 +49,12 @@ end
 
 rule "CyGarageOPEN_AJAR_15"
 when
-    System started or Item CyGarageStatus changed
+    System started or Item CyGarageStatus1 changed or Item CyGarageStatus2 changed
 then
     // If not closed and we haven't already started the timer,
     // then start a new one and alert in 15 min if the door is
     // still open. Otherwise, kill any existing timer. 
-    if (CyGarageStatus.state != "CLOSED") {
+    if (CyGarageStatus1.state != "CLOSED" or CyGarageStatus2.state != "CLOSED") {
         logInfo(fileName, "Garage door is OPEN or AJAR!")
         if (statusTimer === null) {
             statusTimer = createTimer(now.plusMinutes(notifyDelay), [|

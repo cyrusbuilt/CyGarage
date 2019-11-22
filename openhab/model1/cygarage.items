@@ -1,6 +1,6 @@
 String CyGarageSystemID "System ID: [%s]" <keyring> { channel="mqtt:topic:mosquitto:cygarage:SysID" }
 String CyGarageVersion "Firmware version: [%s]" { channel="mqtt:topic:mosquitto:cygarage:Version" }
 Number CyGarageSysState <status> { channel="mqtt:topic:mosquitto:cygarage:SysState" }
-Switch CyGarage "Garage Door" <wallswitch> { channel="mqtt:topic:mosquitto:cygarage:Activator" }
+Switch CyGarage1 "Garage Door" <wallswitch> { channel="mqtt:topic:mosquitto:cygarage:Activator" }
 String CyGarageStatus "Current position [%s]" <garagedoor> { channel="mqtt:topic:mosquitto:cygarage:DoorState" }
 String CyGarageAction "Actions" <switch>
