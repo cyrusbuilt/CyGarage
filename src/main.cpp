@@ -1,12 +1,12 @@
 /**
  * main.cpp
- * CyGarage v1.7
+ * CyGarage v2.0
  * 
- * (c) 2019, Cyrus Brunner
+ * (c) 2019,2020 Cyrus Brunner
  * 
- * This is the firmware for CyGarage, an IoT garage door opener add-on. The devie is intended
+ * This is the firmware for CyGarage, an IoT garage door opener add-on. The device is intended
  * to integrate with an existing garage door opener and connect via WiFi, providing the ability
- * to sensor when the door is open/closed/ajar and provide a means of opening/closing the door.
+ * to sense when the door is open/closed/ajar and provide a means of opening/closing the door.
  * This firmware also allows for OTA firmware updates, and additionally can be integrated with
  * a home automation server such as OpenHAB.
  */
@@ -16,7 +16,11 @@
 #endif
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClientSecure.h>
+#ifdef ENABLE_TLS
+    #include <WiFiClientSecure.h>
+#else
+    #include <WiFiClient.h>
+#endif
 #include <FS.h>
 #include <time.h>
 #include "DoorContact.h"
@@ -29,8 +33,9 @@
 #include "PubSubClient.h"
 #include "config.h"
 #include "TelemetryHelper.h"
+#include "Console.h"
 
-#define FIRMWARE_VERSION "1.7"
+#define FIRMWARE_VERSION "2.0"
 
 // Workaround to allow an MQTT packet size greater than the default of 128.
 #ifdef MQTT_MAX_PACKET_SIZE
@@ -60,14 +65,17 @@ void onCheckMqtt();
 void onMqttMessage(char* topic, byte* payload, unsigned int length);
 void onSyncClock();
 
-// TODO Get working with public CA certs too.
-
 // Global vars
 #ifdef ENABLE_MDNS
     #include <ESP8266mDNS.h>
     MDNSResponder mdns;
 #endif
-WiFiClientSecure wifiClient;
+#ifdef ENABLE_TLS
+    // TODO Get working with public CA certs too.
+    WiFiClientSecure wifiClient;
+#else
+    WiFiClient wifiClient;
+#endif
 PubSubClient mqttClient(wifiClient);
 #ifdef ENABLE_WEBSERVER
     #warning Enabling the webserver feature poses a security risk. Proceed with caution.
@@ -115,7 +123,9 @@ String mqttPassword = "";
 int mqttPort = MQTT_PORT;
 bool isDHCP = false;
 bool filesystemMounted = false;
-bool connSecured = false;
+#ifdef ENABLE_TLS
+    bool connSecured = false;
+#endif
 volatile SystemState sysState = SystemState::BOOTING;
 #ifdef ENABLE_OTA
     int otaPort = OTA_HOST_PORT;
@@ -214,20 +224,6 @@ void publishSystemState() {
 }
 
 /**
- * Gets an IPAddress value from the specified string.
- * @param value The string containing the IP.
- * @return The IP address.
- */
-IPAddress getIPFromString(String value) {
-    unsigned int ip[4];
-    unsigned char buf[value.length()];
-    value.getBytes(buf, value.length());
-    const char* ipBuf = (const char*)buf;
-    sscanf(ipBuf, "%u.%u.%u.%u", &ip[0], &ip[1], &ip[2], &ip[3]);
-    return IPAddress(ip[0], ip[1], ip[2], ip[3]);
-}
-
-/**
  * Resume normal operation. This will resume any suspended tasks.
  */
 void resumeNormal() {
@@ -236,48 +232,6 @@ void resumeNormal() {
     wifiLED.off();
     sysState = SystemState::NORMAL;
     publishSystemState();
-}
-
-/**
- * Waits for user input from the serial console.
- */
-void waitForUserInput() {
-    while (Serial.available() < 1) {
-        ESPCrashMonitor.iAmAlive();
-        delay(50);
-    }
-}
-
-/**
- * Gets string input from the serial console.
- * @param isPassword If true, echos back a '*' instead of the character
- * that was entered.
- * @return The string that was entered.
- */
-String getInputString(bool isPassword = false) {
-    char c;
-    String result = "";
-    bool gotEndMarker = false;
-    while (!gotEndMarker) {
-        ESPCrashMonitor.iAmAlive();
-        if (Serial.available() > 0) {
-            c = Serial.read();
-            if (c == '\n') {
-                gotEndMarker = true;
-                break;
-            }
-
-            if (isPassword) {
-                Serial.print('*');
-            }
-            else {
-                Serial.print(c);
-            }
-            result += c;
-        }
-    }
-
-    return result;
 }
 
 /**
@@ -359,8 +313,10 @@ void saveConfiguration() {
     #ifdef ENABLE_WEBSERVER
         doc["webserverPort"] = webServerPort;
     #endif
-    doc["serverFingerPrintPath"] = serverFingerprintPath;
-    doc["caCertificatePath"] = caCertificatePath;
+    #ifdef ENABLE_TLS
+        doc["serverFingerPrintPath"] = serverFingerprintPath;
+        doc["caCertificatePath"] = caCertificatePath;
+    #endif
     #ifdef ENABLE_OTA
         doc["otaPort"] = otaPort;
         doc["otaPassword"] = otaPassword;
@@ -465,8 +421,10 @@ void loadConfiguration() {
     statusChannel = doc["mqttStatusChannel"].as<String>();
     mqttUsername = doc["mqttUsername"].as<String>();
     mqttPassword = doc["mqttPassword"].as<String>();
-    serverFingerprintPath = doc["serverFingerprintPath"].as<String>();
-    caCertificatePath = doc["caCertificatePath"].as<String>();
+    #ifdef ENABLE_TLS
+        serverFingerprintPath = doc["serverFingerprintPath"].as<String>();
+        caCertificatePath = doc["caCertificatePath"].as<String>();
+    #endif
     #ifdef ENABLE_OTA
         otaPort = doc["otaPort"].as<int>();
         otaPassword = doc["otaPassword"].as<String>();
@@ -482,6 +440,7 @@ void loadConfiguration() {
  * @return true if the certificates and server fingerprint were successfully
  * loaded; Otherwise, false.
  */
+#ifdef ENABLE_TLS
 bool loadCertificates() {
     Serial.print(F("INFO: Loading SSL certificates... "));
     if (!filesystemMounted) {
@@ -533,6 +492,7 @@ bool loadCertificates() {
     fp.close();
     if (val.length() > 0) {
         fingerprintString = val;
+        fingerprintString.trim();
         wifiClient.setFingerprint(fingerprintString.c_str());
     }
     else {
@@ -576,18 +536,24 @@ bool verifyTLS() {
     ESPCrashMonitor.enableWatchdog(ESPCrashMonitorClass::ETimeout::Timeout_2s);
     return result;
 }
+#endif
 
 /**
  * Confirms with the user that they wish to do a factory restore. If so, then
  * clears the current configuration file in SPIFFS, then reboots. Upon reboot,
  * a new config file will be generated with default values.
+ * @param fromSubmit Set true if request came from the configuration page.
  */
-void doFactoryRestore() {
-    Serial.println();
-    Serial.println(F("Are you sure you wish to restore to factory default? (Y/n)?"));
-    waitForUserInput();
-    String str = getInputString();
-    if (str == "Y" || str == "y") {
+void doFactoryRestore(bool fromSubmit = false) {
+    String str = "N";
+    if (!fromSubmit) {
+        Serial.println();
+        Serial.println(F("Are you sure you wish to restore to factory default? (Y/n)?"));
+        Console.waitForUserInput();
+        str = Console.getInputString();
+    }
+    
+    if (str == "Y" || str == "y" || fromSubmit) {
         Serial.print(F("INFO: Clearing current config... "));
         if (filesystemMounted) {
             if (SPIFFS.remove(CONFIG_FILE_PATH)) {
@@ -633,14 +599,16 @@ bool reconnectMqttClient() {
         Serial.print(F(" on port: "));
         Serial.print(mqttPort);
         Serial.println(F("..."));
-        if (!connSecured) {
-            connSecured = verifyTLS();
+        #ifdef ENABLE_TLS
             if (!connSecured) {
-                Serial.println(F("ERROR: Unable to establish TLS connection to host."));
-                Serial.println(F("ERROR: Invalid certificate or SSL negotiation failed."));
-                return false;
+                connSecured = verifyTLS();
+                if (!connSecured) {
+                    Serial.println(F("ERROR: Unable to establish TLS connection to host."));
+                    Serial.println(F("ERROR: Invalid certificate or SSL negotiation failed."));
+                    return false;
+                }
             }
-        }
+        #endif
 
         bool didConnect = false;
         if (mqttUsername.length() > 0 && mqttPassword.length() > 0) {
@@ -774,8 +742,11 @@ void handleControlRequest(String id, ControlCommand cmd) {
         return;
     }
 
+    // When system is the "disabled" state, the only command it will accept
+    // is "enable". All other commands are ignored.
     if (sysState == SystemState::DISABLED &&
         cmd != ControlCommand::ENABLE) {
+        // THOU SHALT NOT PASS!!! 
         // We can't process this command because we are disabled.
         Serial.print(F("WARN: Ingoring command "));
         Serial.print((uint8_t)cmd);
@@ -817,6 +788,9 @@ void handleControlRequest(String id, ControlCommand cmd) {
 /**
  * Callback method for handling incoming MQTT messages on the subscribed
  * channel(s). This will decode the message and process incoming commands.
+ * Commands are only executed if the command was intended for this device.
+ * The system makes this determination by comaparing the ID in the JSON
+ * payload with the systems currenty device ID (host name).
  * @param topic The topic the message came in on.
  * @param payload The message payload. The payload is assumed to be in
  * JSON format and will attempt to parse the message into a JSON object.
@@ -931,39 +905,6 @@ void initMQTT() {
 }
 
 /**
- * Prompts the user with a configuration screen and waits for
- * user input.
- */
-void promptConfig() {
-    Serial.println();
-    Serial.println(F("=============================="));
-    Serial.println(F("= Command menu:              ="));
-    Serial.println(F("=                            ="));
-    Serial.println(F("= r: Reboot                  ="));
-    Serial.println(F("= c: Configure network       ="));
-    Serial.println(F("= m: Configure MQTT settings ="));
-    Serial.println(F("= s: Scan wireless networks  ="));
-    Serial.println(F("= n: Connect to new network  ="));
-    Serial.println(F("= w: Reconnect to WiFi       ="));
-    Serial.println(F("= e: Resume normal operation ="));
-    Serial.println(F("= g: Get network info        ="));
-    Serial.print(F("= a: Activate door "));
-    #ifdef CG_MODEL_2
-        Serial.println(F("1         ="));
-        Serial.println(F("= b: Activate door 2        ="));
-    #else
-        Serial.println(F("          ="));
-    #endif
-    Serial.println(F("= f: Save config changes     ="));
-    Serial.println(F("= z: Restore default config  ="));
-    Serial.println(F("=                            ="));
-    Serial.println(F("=============================="));
-    Serial.println();
-    Serial.println(F("Enter command choice (r/c/m/s/n/w/e/g/a/f/z): "));
-    waitForUserInput();
-}
-
-/**
  * Attempt to connect to the configured WiFi network. This will break any existing connection first.
  */
 void connectWifi() {
@@ -996,255 +937,12 @@ void connectWifi() {
     }
 
     if (WiFi.status() != WL_CONNECTED) {
+        // Connection failed. Maybe the AP went down? Let's try again later.
         Serial.println(F("ERROR: Failed to connect to WiFi!"));
-        failSafe();
+        Serial.println(F("WARN: Will attempt to reconnect at scheduled interval."));
     }
     else {
         printNetworkInfo();
-    }
-}
-
-/**
- * Prompts the user for (and the applies) new MQTT configuration settings.
- */
-void configureMQTT() {
-    mqttClient.unsubscribe(controlChannel.c_str());
-    mqttClient.disconnect();
-
-    Serial.print(F("Current MQTT broker = "));
-    Serial.println(mqttBroker);
-    Serial.println(F("Enter MQTT broker address:"));
-    waitForUserInput();
-    mqttBroker = getInputString();
-    Serial.println();
-    Serial.print(F("New broker = "));
-    Serial.println(mqttBroker);
-
-    Serial.print(F("Current port = "));
-    Serial.println(mqttPort);
-    Serial.println(F("Enter MQTT broker port:"));
-    waitForUserInput();
-    String str = getInputString();
-    mqttPort = str.toInt();
-    Serial.println();
-    Serial.print(F("New port = "));
-    Serial.println(mqttPort);
-
-    Serial.print(F("Current control channel = "));
-    Serial.println(controlChannel);
-    Serial.println(F("Enter MQTT control channel:"));
-    waitForUserInput();
-    controlChannel = getInputString();
-    Serial.println();
-    Serial.print(F("New control channel = "));
-    Serial.println(controlChannel);
-
-    Serial.print(F("Current status channel = "));
-    Serial.println(statusChannel);
-    Serial.println(F("Enter MQTT status channel:"));
-    waitForUserInput();
-    statusChannel = getInputString();
-    Serial.println();
-    Serial.print(F("New status channel = "));
-    Serial.println(statusChannel);
-
-    Serial.print(F("Current username: "));
-    Serial.println(mqttUsername);
-    Serial.println(F("Enter new username, or just press enter to clear:"));
-    waitForUserInput();
-    mqttPassword = getInputString();
-    Serial.print(F("New MQTT username = "));
-    Serial.println(mqttUsername);
-
-    Serial.print(F("Current password: "));
-    for (uint8_t i = 0; i < mqttPassword.length(); i++) {
-        Serial.print(F("*"));
-    }
-
-    Serial.println();
-    Serial.print(F("Enter new password, or just press enter to clear"));
-    waitForUserInput();
-    mqttPassword = getInputString(true);
-
-    initMQTT();
-    Serial.println();
-}
-
-/**
- * Prompts the user for, and configures static IP settings.
- */
-void configureStaticIP() {
-    isDHCP = false;
-    Serial.println(F("Enter IP address: "));
-    waitForUserInput();
-    ip = getIPFromString(getInputString());
-    Serial.print(F("New IP: "));
-    Serial.println(ip);
-
-    Serial.println(F("Enter gateway: "));
-    waitForUserInput();
-    gw = getIPFromString(getInputString());
-    Serial.print(F("New gateway: "));
-    Serial.println(gw);
-
-    Serial.println(F("Enter subnet mask: "));
-    waitForUserInput();
-    sm = getIPFromString(getInputString());
-    Serial.print(F("New subnet mask: "));
-    Serial.println(sm);
-
-    Serial.println(F("Enter DNS server: "));
-    waitForUserInput();
-    dns = getIPFromString(getInputString());
-    Serial.print(F("New DNS server: "));
-    Serial.println(dns);
-
-    WiFi.config(ip, gw, sm, dns);  // If actual IP set, then disables DHCP and assumes static.
-}
-
-/**
- * Prompts the user for and then attempts to connect to a new
- * WiFi network.
- */
-void configureWiFiNetwork() {
-    Serial.println(F("Enter new SSID: "));
-    waitForUserInput();
-    ssid = getInputString();
-    Serial.print(F("SSID = "));
-    Serial.println(ssid);
-
-    Serial.println(F("Enter new password: "));
-    waitForUserInput();
-    password = getInputString();
-    Serial.print(F("Password = "));
-    Serial.println(password);
-
-    connectWifi();
-}
-
-/**
- * Checks commands entered by the user via serial input and carries out
- * the specified action if valid.
- */
-void checkCommand() {
-    String str = "";
-    char incomingByte = Serial.read();
-    switch (incomingByte) {
-        case 'r':
-            // Reset the controller.
-            reboot();
-            break;
-        case 's':
-            // Scan for available networks.
-            getAvailableNetworks();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'c':
-            // Set hostname.
-            Serial.print(F("Current host name: "));
-            Serial.println(hostName);
-            Serial.println(F("Set new host name: "));
-            waitForUserInput();
-            hostName = getInputString();
-            initMDNS();
-
-            // Change network mode.
-            Serial.println(F("Choose network mode (d = DHCP, t = Static):"));
-            waitForUserInput();
-            checkCommand();
-            break;
-        case 'd':
-            // Switch to DHCP mode.
-            if (isDHCP) {
-                Serial.println(F("INFO: DHCP mode already set. Skipping..."));
-                Serial.println();
-            }
-            else {
-                isDHCP = true;
-                Serial.println(F("INFO: Set DHCP mode."));
-                WiFi.config(0U, 0U, 0U, 0U);
-            }
-            promptConfig();
-            checkCommand();
-            break;
-        case 't':
-            // Switch to static IP mode. Request IP settings.
-            configureStaticIP();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'w':
-            // Attempt to reconnect to WiFi.
-            onCheckWiFi();
-            if (WiFi.status() == WL_CONNECTED) {
-                printNetworkInfo();
-                resumeNormal();
-            }
-            else {
-                Serial.println(F("ERROR: Still no network connection."));
-                promptConfig();
-                checkCommand();
-            }
-            break;
-        case 'n':
-            // Connect to a new wifi network.
-            configureWiFiNetwork();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'e':
-            // Resume normal operation.
-            resumeNormal();
-            break;
-        case 'g':
-            // Get network info.
-            printNetworkInfo();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'a':
-            activateDoor();
-            delay(1000);
-            garageDoorRelay.open();
-            promptConfig();
-            checkCommand();
-            break;
-        #ifdef CG_MODEL_2
-        case 'b':
-            activateDoor2();
-            delay(1000);
-            garageDoorRelay2.open();
-            promptConfig();
-            checkCommand();
-            break;
-        #endif
-        case 'f':
-            // Save configuration changes and restart services.
-            saveConfiguration();
-            WiFi.disconnect(true);
-            onCheckWiFi();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'z':
-            // Reset config to factory default.
-            doFactoryRestore();
-            promptConfig();
-            checkCommand();
-            break;
-        case 'm':
-            // Set MQTT settings.
-            configureMQTT();
-            promptConfig();
-            checkCommand();
-            break;
-        default:
-            // Specified command is invalid.
-            Serial.println(F("WARN: Unrecognized command."));
-            promptConfig();
-            checkCommand();
-            break;
     }
 }
 
@@ -1265,18 +963,7 @@ void failSafe() {
     #ifdef CG_MODEL_2
         garageDoorRelay2.open();
     #endif
-    promptConfig();
-    checkCommand();
-}
-
-/**
- * Check for the user to press the 'i' key at the serial console to
- * interrupt normal operation and present the configuration menu.
- */
-void checkInterrupt() {
-    if (Serial.available() > 0 && Serial.read() == 'i') {
-        failSafe();
-    }
+    Console.enterCommandInterpreter();
 }
 
 /**
@@ -1522,6 +1209,119 @@ void initCrashMonitor() {
     delay(100);
 }
 
+void onActivateDoor1() {
+    activateDoor();
+    delay(1000);
+    garageDoorRelay.open();
+    Console.enterCommandInterpreter();
+}
+
+#ifdef CG_MODEL_2
+void onActivateDoor2() {
+    activateDoor2();
+    delay(1000);
+    garageDoorRelay2.open();
+    Console.enterCommandInterpreter();
+}
+#endif
+
+void handleFactoryRestore() {
+    doFactoryRestore();
+    reboot();
+}
+
+void onNewHostName(const char* newHostName) {
+    hostName = newHostName;
+    initMDNS();
+}
+
+void onSwitchToDhcp() {
+    if (isDHCP) {
+        Serial.println(F("INFO: DHCP mode already set. Skipping..."));
+        Serial.println();
+    }
+    else {
+        isDHCP = true;
+        Serial.println(F("INFO: Set DHCP mode."));
+        WiFi.config(0U, 0U, 0U, 0U);
+    }
+}
+
+void onSwitchToStaticConfig(IPAddress newIp, IPAddress newSm, IPAddress newGw, IPAddress newDns) {
+    ip = newIp;
+    sm = newSm;
+    gw = newGw;
+    dns = newDns;
+    WiFi.config(ip, gw, sm, dns);  // If actual IP set, then disables DHCP and assumes static.
+}
+
+void onReconnectFromConsole() {
+    // Attempt to reconnect to WiFi.
+    onCheckWiFi();
+    if (WiFi.status() == WL_CONNECTED) {
+        printNetworkInfo();
+        resumeNormal();
+    }
+    else {
+        Serial.println(F("ERROR: Still no network connection."));
+        Console.enterCommandInterpreter();
+    }
+}
+
+void onWifiConfig(String newSsid, String newPassword) {
+    ssid = newSsid;
+    password = newPassword;
+    connectWifi();
+}
+
+void onSaveConfig() {
+    saveConfiguration();
+    WiFi.disconnect(true);
+    onCheckWiFi();
+}
+
+void onMqttConfigCommand(String newBroker, int newPort, String newUsername, String newPass, String newConChan, String newStatChan) {
+    mqttClient.unsubscribe(controlChannel.c_str());
+    mqttClient.disconnect();
+    mqttBroker = newBroker;
+    mqttPort = newPort;
+    mqttUsername = newUsername;
+    mqttPassword = newPass;
+    controlChannel = newConChan;
+    statusChannel = newStatChan;
+    initMQTT();
+    Serial.println();
+}
+
+/**
+ * Initialize the CLI.
+ */
+void initConsole() {
+    Serial.print(F("INIT: Initializing console... "));
+    Console.setHostName(hostName);
+    Console.setMqttConfig(mqttBroker, mqttPort, mqttUsername, mqttPassword, controlChannel, statusChannel);
+
+    Console.onActivateDoor1(onActivateDoor1);
+    #ifdef CG_MODEL_2
+    Console.onActivateDoor2(onActivateDoor2);
+    #endif
+    Console.onRebootCommand(reboot);
+    Console.onScanNetworks(getAvailableNetworks);
+    Console.onHostNameChange(onNewHostName);
+    Console.onDhcpConfig(onSwitchToDhcp);
+    Console.onStaticConfig(onSwitchToStaticConfig);
+    Console.onReconnectCommand(onReconnectFromConsole);
+    Console.onWiFiConfigCommand(onWifiConfig);
+    Console.onResumeCommand(resumeNormal);
+    Console.onGetNetInfoCommand(printNetworkInfo);
+    Console.onSaveConfigCommand(onSaveConfig);
+    Console.onMqttConfigCommand(onMqttConfigCommand);
+    Console.onConsoleInterrupt(failSafe);
+    Console.onFactoryRestore(handleFactoryRestore);
+
+    Serial.println(F("DONE"));
+}
+
 /**
  * Bootstrap routine. Executes once at boot and initializes all subsystems in sequence.
  */
@@ -1537,14 +1337,19 @@ void setup() {
     initWebServer();
     initOTA();
     
-    if (loadCertificates()) {
-        if (verifyTLS()) {
-            connSecured = true;
-            initMQTT();
+    #ifdef ENABLE_TLS
+        if (loadCertificates()) {
+            if (verifyTLS()) {
+                connSecured = true;
+                initMQTT();
+            }
         }
-    }
+    #else
+        initMQTT();
+    #endif
     
     initTaskManager();
+    initConsole();
     Serial.println(F("INIT: Boot sequence complete."));
     sysState = SystemState::NORMAL;
     ESPCrashMonitor.enableWatchdog(ESPCrashMonitorClass::ETimeout::Timeout_2s);
@@ -1556,7 +1361,7 @@ void setup() {
  */
 void loop() {
     ESPCrashMonitor.iAmAlive();
-    checkInterrupt();
+    Console.checkInterrupt();
     taskMan.execute();
     #ifdef ENABLE_MDNS
         mdns.update();

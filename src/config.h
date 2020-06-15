@@ -1,8 +1,8 @@
 /**
  * config.h
- * CyGarage v1.5
+ * CyGarage v2.0
  * 
- * (c) 2019, Cyrus Brunner
+ * (c) 2019,2020, Cyrus Brunner
  * 
  * This file provides default configuration values. Some of these values can
  * be overridden using a configuration file called 'config.json' in the root
@@ -17,15 +17,16 @@
 #include <IPAddress.h>
 
 // Configuration
-#define CG_MODEL_2                              // Comment this line to revert to Model 1 (single door) firmware.
+//#define CG_MODEL_2                            // Comment this line to revert to Model 1 (single door) firmware.
 #define ENABLE_OTA                              // Comment this line to disable OTA updates.
 #define ENABLE_MDNS                             // Comment this line to disable the MDNS.
+//#define ENABLE_TLS                            // Comment this line to disable TLS (MQTT-over-SSL) support.
 // The following option is disabled by default for security reasons. If you need basic unencrypted HTTP
 // functionality (particularly if you are using CyGarageMobile v1.0), then uncomment the following line.
 // /**
 //  * @deprecated Will be removed in a future version.
 //  */
-//#define ENABLE_WEBSERVER                        // Comment this line to disable the embedded web server.
+//#define ENABLE_WEBSERVER                      // Comment this line to disable the embedded web server.
 #define CONFIG_FILE_PATH "/config.json"         // The config file path. Do not alter unless you are sure.
 #define DEFAULT_SSID "your_ssid_here"           // Put the SSID of your WiFi here.
 #define DEFAULT_PASSWORD "your_wifi_password"   // Put your WiFi password here.

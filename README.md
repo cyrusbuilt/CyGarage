@@ -12,7 +12,7 @@ CyGarage firmware versions prior to v1.3 had no security built-in and used basic
 
 ## Theory of Operation
 
-The way this is intended to work is: when the device detects that the door is open or ajar, the user can see this status and (if integrated with OpenHAB or some other similar system) and can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.
+The way this is intended to work is: when the device detects that the door is open or ajar, the user can see this status and (if integrated with OpenHAB or some other similar system) and can get notifications when this occurs. When the device receives the activate command, it then triggers a relay which simulates the garage door button press which will in turn raise or lower the door depending on the current state.  Door activation is essentially "fire-and-forget". It will activate the relay and then assume that the garage door is working. CyGarage then monitors door state using the 2 sensor inputs. It is important to understand this system is not intended to replace the controller inside the garage door opener, but instead *compliments* it by adding state monitoring and remote activation.  Safety checks (something in the path of the door when closing) should still be handled by the garage door opener itself, for example.
 
 ## Configuration
 
@@ -79,6 +79,10 @@ This configuration file is pretty self explanatory and one is included in the so
 - caCertificatePath: The path to the CA certificate that the MQTT broker's certificate was signed with. Default is '/ca.crt'.
 
 If the above values are omitted or invalid, then the system will fail during loadCertificates() and will not be able to connect to MQTT.
+
+## Startup Configuration Sequence
+
+During the boot sequence, configuration defaults are loaded from the directives in config.h. If the config.json file is present at boot, then any configuration values found in there will override the default values in memory.  If no config.json file is found or if it could not be read, then the system will continue using the default values and then generate a new config.json file and populate it with the default values that were loaded. Upon subsequent boots, these values can then be read from config.json and altered by the user. When configuration changes are made from the CLI, the altered values take effect immediately, but are only stored in memory unless the users chooses to save the configuration. Otherwise, all in-memory configuration changes are lost upon reboot (intentionally) so that the user can fallback to a known-good state they entered bad configuration data.
 
 ## Getting Started
 

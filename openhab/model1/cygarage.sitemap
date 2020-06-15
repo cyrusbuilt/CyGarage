@@ -8,7 +8,7 @@ sitemap cygarage label="CyGarage"
         Text item=CyGarageSysState label="System State: Updating" visibility=[CyGarageSysState==2]
         Text item=CyGarageSysState label="System State: Disabled" visibility=[CyGarageSysState==3]
         Text item=CyGarageSysState label="System State: Offline" visibility=[CyGarageSysState==NULL,CyGarageSysState==UNDEF]
-        Switch item=CyGarage mappings=[ON="Activate"]
+        Switch item=CyGarage1 mappings=[ON="Activate"]
         Text item=CyGarageStatus
         Selection item=CyGarageAction label="Actions" mappings=[0="Disable",1="Enable",3="Reboot",4="Request Status"]
     }
