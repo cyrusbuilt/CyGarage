@@ -27,3 +27,6 @@ certs/
 
 # gerber files
 gerber.zip
+
+# Backup files
+*.bak
