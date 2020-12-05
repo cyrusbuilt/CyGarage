@@ -1,6 +1,6 @@
 /**
  * main.cpp
- * CyGarage v2.0
+ * CyGarage v2.1
  * 
  * (c) 2019,2020 Cyrus Brunner
  * 
@@ -35,7 +35,10 @@
 #include "TelemetryHelper.h"
 #include "Console.h"
 
-#define FIRMWARE_VERSION "2.0"
+#define FIRMWARE_VERSION "2.1"
+
+// Startup delay before processing MQTT messages.
+#define MQTT_STARTUP_DELAY 5000
 
 // Workaround to allow an MQTT packet size greater than the default of 128.
 #ifdef MQTT_MAX_PACKET_SIZE
@@ -64,6 +67,7 @@ void failSafe();
 void onCheckMqtt();
 void onMqttMessage(char* topic, byte* payload, unsigned int length);
 void onSyncClock();
+void onEnableMqtt();
 
 // Global vars
 #ifdef ENABLE_MDNS
@@ -104,6 +108,7 @@ Task tCheckActivation(ACTIVATION_DURATION, TASK_FOREVER, &onCheckActivation);
 Task tCheckSensors(CHECK_SENSORS_INTERVAL, TASK_FOREVER, &onCheckSensors);
 Task tCheckMqtt(CHECK_MQTT_INTERVAL, TASK_FOREVER, &onCheckMqtt);
 Task tSyncClock(CLOCK_SYNC_INTERVAL, TASK_FOREVER, &onSyncClock);
+Task tEnableMqtt(MQTT_STARTUP_DELAY, TASK_ONCE, &onEnableMqtt);
 Scheduler taskMan;
 String hostName = DEVICE_NAME;
 String ssid = DEFAULT_SSID;
@@ -127,6 +132,7 @@ bool filesystemMounted = false;
     bool connSecured = false;
 #endif
 volatile SystemState sysState = SystemState::BOOTING;
+volatile bool ignoreMqtt = true;
 #ifdef ENABLE_OTA
     int otaPort = OTA_HOST_PORT;
     String otaPassword = OTA_PASSWORD;
@@ -189,6 +195,11 @@ void onSyncClock() {
     Serial.println(F(" DONE"));
     Serial.print(F("INFO: Current time: "));
     Serial.println(asctime(timeinfo));
+}
+
+void onEnableMqtt() {
+    Serial.println(F("INIT: Disabling MQTT message processing deferral flag."));
+    ignoreMqtt = false;
 }
 
 /**
@@ -809,6 +820,10 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     }
 
     Serial.println(msg);
+    if (sysState == SystemState::BOOTING || ignoreMqtt) {
+        Serial.println(F("INIT: Boot sequence incomplete or message processing temporarily disabled."));
+        return;
+    }
 
     StaticJsonDocument<100> doc;
     DeserializationError error = deserializeJson(doc, msg);
@@ -1107,12 +1122,14 @@ void initTaskManager() {
     taskMan.addTask(tCheckWifi);
     taskMan.addTask(tCheckMqtt);
     taskMan.addTask(tSyncClock);
+    taskMan.addTask(tEnableMqtt);
     
     tCheckWifi.enableDelayed(30000);
     tCheckSensors.enable();
     tCheckActivation.enable();
     tCheckMqtt.enableDelayed(1000);
     tSyncClock.enable();
+    tEnableMqtt.enableDelayed(1000);
     Serial.println(F("DONE"));
 }
 
