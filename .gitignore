@@ -10,7 +10,6 @@
 disassembly.txt
 
 # These are currently empty, so we don't need them.
-include/
 lib/
 test/
 
@@ -26,7 +25,7 @@ certs/
 .DS_Store
 
 # gerber files
-gerber.zip
+*.zip
 
 # Backup files
 *.bak
