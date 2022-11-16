@@ -1,14 +1,15 @@
 /**
- * main.cpp
- * CyGarage v2.2
- * 
- * (c) 2019,2020 Cyrus Brunner
- * 
- * This is the firmware for CyGarage, an IoT garage door opener add-on. The device is intended
+ * @file main.cpp
+ * @author Chris "Cyrus" Brunner (cyrusbuilt at gmail dot com)
+ * @brief  This is the firmware for CyGarage, an IoT garage door opener add-on. The device is intended
  * to integrate with an existing garage door opener and connect via WiFi, providing the ability
  * to sense when the door is open/closed/ajar and provide a means of opening/closing the door.
  * This firmware also allows for OTA firmware updates, and additionally can be integrated with
  * a home automation server such as OpenHAB.
+ * @version 2.3
+ * @date 2022-11-15
+ * 
+ * @copyright Copyright (c) 2022 Cyrus Brunner
  */
 
 #ifndef ESP8266
@@ -19,6 +20,7 @@
 #include <WiFiClient.h>
 #include <FS.h>
 #include <time.h>
+#include <TZ.h>
 #include "DoorContact.h"
 #include "LED.h"
 #include "Relay.h"
@@ -31,16 +33,10 @@
 #include "TelemetryHelper.h"
 #include "Console.h"
 
-#define FIRMWARE_VERSION "2.2"
+#define FIRMWARE_VERSION "2.3"
 
 // Startup delay before processing MQTT messages.
 #define MQTT_STARTUP_DELAY 5000
-
-// Workaround to allow an MQTT packet size greater than the default of 128.
-#ifdef MQTT_MAX_PACKET_SIZE
-#undef MQTT_MAX_PACKET_SIZE
-#endif
-#define MQTT_MAX_PACKET_SIZE 200
 
 // Pin definitions
 #define PIN_SENSOR_LED 5
@@ -97,7 +93,7 @@ volatile SystemState sysState = SystemState::BOOTING;
 volatile bool ignoreMqtt = true;
 
 /**
- * Read the specified sensor pins and determine the door state. Prints
+ * @brief Read the specified sensor pins and determine the door state. Prints
  * the result to console and returns the state as string.
  * @return The state string.
  */
@@ -115,6 +111,10 @@ String deviceStatus() {
     return state;
 }
 
+/**
+ * @brief (Model 2 controllers only) Reads the door sensor to determine the
+ * door state for door 2.
+ */
 #ifdef CG_MODEL_2
 String deviceStatus2() {
     String state = "AJAR";
@@ -131,19 +131,23 @@ String deviceStatus2() {
 }
 #endif
 
-tm *getCurrentTime() {
+/**
+ * @brief Gets the current time as a string.
+ * @return String The current date/time.
+ */
+String getCurrentTime() {
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
-    return timeinfo;
+    return String(asctime(timeinfo));
 }
 
 /**
- * Synchronize the local system clock via NTP. Note: This does not take DST
+ * @brief Synchronize the local system clock via NTP. Note: This does not take DST
  * into account. Currently, you will have to adjust the CLOCK_TIMEZONE define
  * manually to account for DST when needed.
  */
 void onSyncClock() {
-    configTime(CLOCK_TIMEZONE * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    configTime(TZ_America_New_York, "pool.ntp.org");
 
     Serial.print("INIT: Waiting for NTP time sync...");
     delay(500);
@@ -152,21 +156,22 @@ void onSyncClock() {
         Serial.print(F("."));
         delay(500);
     }
-
-    struct tm *timeinfo = getCurrentTime();
     
     Serial.println(F(" DONE"));
     Serial.print(F("INFO: Current time: "));
-    Serial.println(asctime(timeinfo));
+    Serial.println(getCurrentTime());
 }
 
+/**
+ * @brief Enables MQTT message processing.
+ */
 void onEnableMqtt() {
     Serial.println(F("INIT: Disabling MQTT message processing deferral flag."));
     ignoreMqtt = false;
 }
 
 /**
- * Publishes the system state to the MQTT status channel and
+ * @brief Publishes the system state to the MQTT status topic and
  * blinks the WiFi status LED.
  */
 void publishSystemState() {
@@ -198,7 +203,34 @@ void publishSystemState() {
 }
 
 /**
- * Resume normal operation. This will resume any suspended tasks.
+ * @brief Publishes a discovery packet to the configured discovery topic if
+ * currently connected to WiFi.
+ */
+void publishDiscoveryPacket() {
+    if (mqttClient.connected()) {
+        wifiLED.on();
+
+        DynamicJsonDocument doc(250);
+        doc["name"] = config.hostname;
+        doc["class"] = DEVICE_CLASS;
+        doc["statusTopic"] = config.mqttTopicStatus;
+        doc["controlTopic"] = config.mqttTopicControl;
+
+        String jsonStr;
+        size_t len = serializeJson(doc, jsonStr);
+        Serial.print(F("INFO: Publishing discovery packet: "));
+        Serial.println(jsonStr);
+        if (!mqttClient.publish(config.mqttTopicStatus.c_str(), jsonStr.c_str(), len)) {
+            Serial.println(F("ERROR: Failed to publish message."));
+        }
+
+        doc.clear();
+        wifiLED.off();
+    }
+}
+
+/**
+ * @brief Resume normal operation. This will resume any suspended tasks.
  */
 void resumeNormal() {
     Serial.println(F("INFO: Resuming normal operation..."));
@@ -209,7 +241,7 @@ void resumeNormal() {
 }
 
 /**
- * Prints network information details to the serial console.
+ * @brief Prints network information details to the serial console.
  */
 void printNetworkInfo() {
     Serial.print(F("INFO: Local IP: "));
@@ -226,7 +258,8 @@ void printNetworkInfo() {
 }
 
 /**
- * Scan for available networks and dump each discovered network to the console.
+ * @brief Scan for available networks and dump each discovered network to the
+ * console.
  */
 void getAvailableNetworks() {
     ESPCrashMonitor.defer();
@@ -244,7 +277,7 @@ void getAvailableNetworks() {
 }
 
 /**
- * Reboots the MCU after a 1 second delay.
+ * @brief Reboots the MCU after a 1 second delay.
  */
 void reboot() {
     Serial.println(F("INFO: Rebooting... "));
@@ -254,7 +287,7 @@ void reboot() {
 }
 
 /**
- * Stores the in-memory configuration to a JSON file stored in SPIFFS.
+ * @brief Stores the in-memory configuration to a JSON file stored in SPIFFS.
  * If the file does not yet exist, it will be created (see CONFIG_FILE_PATH).
  * Errors will be reported to the serial console if the filesystem is not
  * mounted or if the file could not be opened for writing.
@@ -280,8 +313,9 @@ void saveConfiguration() {
     doc["wifiPassword"] = config.password;
     doc["mqttBroker"] = config.mqttBroker;
     doc["mqttPort"] = config.mqttPort;
-    doc["mqttControlChannel"] = config.mqttTopicControl;
-    doc["mqttStatusChannel"] = config.mqttTopicStatus;
+    doc["mqttControlTopic"] = config.mqttTopicControl;
+    doc["mqttStatusTopic"] = config.mqttTopicStatus;
+    doc["mqttDiscoveryTopic"] = config.mqttTopicDiscovery;
     doc["mqttUsername"] = config.mqttUsername;
     doc["mqttPassword"] = config.mqttPassword;
     #ifdef ENABLE_OTA
@@ -304,12 +338,19 @@ void saveConfiguration() {
     Serial.println(F("DONE"));
 }
 
+/**
+ * @brief Helper method for printing a warning message during config load.
+ * @param message The message to print.
+ */
 void printWarningAndContinue(const __FlashStringHelper *message) {
     Serial.println();
     Serial.println(message);
     Serial.print(F("INFO: Continuing... "));
 }
 
+/**
+ * @brief Sets the running config to default configuration values.
+ */
 void setConfigurationDefaults() {
     String chipId = String(ESP.getChipId(), HEX);
     String defHostname = String(DEVICE_NAME) + "_" + chipId;
@@ -321,6 +362,7 @@ void setConfigurationDefaults() {
     config.mqttPort = MQTT_PORT;
     config.mqttTopicControl = MQTT_TOPIC_CONTROL;
     config.mqttTopicStatus = MQTT_TOPIC_STATUS;
+    config.mqttTopicDiscovery = MQTT_TOPIC_DISCOVERY;
     config.mqttUsername = "";
     config.password = DEFAULT_PASSWORD;
     config.sm = defaultSm;
@@ -337,7 +379,7 @@ void setConfigurationDefaults() {
 }
 
 /**
- * Loads the configuration from CONFIG_FILE_PATH into memory and uses that as
+ * @brief Loads the configuration from CONFIG_FILE_PATH into memory and uses that as
  * the running configuration. Will report errors to the serial console and
  * revert to the default configuration under the following conditions:
  * 1) The filesystem is not mounted.
@@ -442,8 +484,9 @@ void loadConfiguration() {
     config.password = doc.containsKey("wifiPassword") ? doc["wifiPassword"].as<String>() : DEFAULT_PASSWORD;
     config.mqttBroker = doc.containsKey("mqttBroker") ? doc["mqttBroker"].as<String>() : MQTT_BROKER;
     config.mqttPort = doc.containsKey("mqttPort") ? doc["mqttPort"].as<int>() : MQTT_PORT;
-    config.mqttTopicControl = doc.containsKey("mqttControlChannel") ? doc["mqttControlChannel"].as<String>() : MQTT_TOPIC_CONTROL;
-    config.mqttTopicStatus = doc.containsKey("mqttStatusChannel") ? doc["mqttStatusChannel"].as<String>() : MQTT_TOPIC_STATUS;
+    config.mqttTopicControl = doc.containsKey("mqttControlTopic") ? doc["mqttControlTopic"].as<String>() : MQTT_TOPIC_CONTROL;
+    config.mqttTopicStatus = doc.containsKey("mqttStatusTopic") ? doc["mqttStatusTopic"].as<String>() : MQTT_TOPIC_STATUS;
+    config.mqttTopicDiscovery = doc.containsKey("mqttDiscoveryTopic") ? doc["mqttDiscoveryTopic"].as<String>() : MQTT_TOPIC_DISCOVERY;
     config.mqttUsername = doc.containsKey("mqttUsername") ? doc["mqttUsername"].as<String>() : "";
     config.mqttPassword = doc.containsKey("mqttPassword") ? doc["mqttPassword"].as<String>() : "";
     #ifdef ENABLE_OTA
@@ -456,21 +499,17 @@ void loadConfiguration() {
 }
 
 /**
- * Confirms with the user that they wish to do a factory restore. If so, then
+ * @brief Confirms with the user that they wish to do a factory restore. If so, then
  * clears the current configuration file in SPIFFS, then reboots. Upon reboot,
  * a new config file will be generated with default values.
- * @param fromSubmit Set true if request came from the configuration page.
  */
-void doFactoryRestore(bool fromSubmit = false) {
-    String str = "N";
-    if (!fromSubmit) {
-        Serial.println();
-        Serial.println(F("Are you sure you wish to restore to factory default? (Y/n)?"));
-        Console.waitForUserInput();
-        str = Console.getInputString();
-    }
-    
-    if (str == "Y" || str == "y" || fromSubmit) {
+void doFactoryRestore() {
+    Serial.println();
+    Serial.println(F("Are you sure you wish to restore to factory default? (Y/n)?"));
+    Console.waitForUserInput();
+
+    String str = Console.getInputString();
+    if (str == "Y" || str == "y") {
         Serial.print(F("INFO: Clearing current config... "));
         if (filesystemMounted) {
             if (SPIFFS.remove(CONFIG_FILE_PATH)) {
@@ -502,7 +541,7 @@ void doFactoryRestore(bool fromSubmit = false) {
 }
 
 /**
- * Attempts to re-connect to the MQTT broker if then connection is
+ * @brief Attempts to re-connect to the MQTT broker if then connection is
  * currently broken.
  * @return true if a connection to the MQTT broker is either already
  * established, or was successfully re-established; Otherwise, false.
@@ -526,12 +565,15 @@ bool reconnectMqttClient() {
         }
 
         if (didConnect) {
-            Serial.print(F("INFO: Subscribing to channel: "));
+            Serial.print(F("INFO: Subscribing to topic: "));
             Serial.println(config.mqttTopicControl);
             mqttClient.subscribe(config.mqttTopicControl.c_str());
 
-            Serial.print(F("INFO: Publishing to channel: "));
+            Serial.print(F("INFO: Publishing to topic: "));
             Serial.println(config.mqttTopicStatus);
+
+            Serial.print(F("INFO: Discovery topic: "));
+            Serial.println(config.mqttTopicDiscovery);
         }
         else {
             String failReason = TelemetryHelper::getMqttStateDesc(mqttClient.state());
@@ -545,7 +587,7 @@ bool reconnectMqttClient() {
 }
 
 /**
- * Callback method for checking the MQTT connection state and
+ * @brief Callback method for checking the MQTT connection state and
  * reconnecting if necessary. If the connection is broken, and
  * reconnection fails, another attempt will be made after CHECK_MQTT_INTERVAL.
  */
@@ -554,6 +596,7 @@ void onCheckMqtt() {
     if (reconnectMqttClient()) {
         Serial.println(F("INFO: Successfully reconnected to MQTT broker."));
         publishSystemState();
+        publishDiscoveryPacket();
     }
     else {
         Serial.println(F("ERROR: MQTT connection lost and reconnect failed."));
@@ -564,17 +607,16 @@ void onCheckMqtt() {
 }
 
 /**
- * Activates the door control relay, sends response to HTTP client, and
+ * @brief Activates the door control relay, sends response to HTTP client, and
  * blinks WiFi LED to indicate activity.
  */
 void activateDoor() {
-    struct tm *timeinfo = getCurrentTime();
     Serial.print(F("INFO: Activating door "));
     #ifdef CG_MODEL_2
         Serial.print(F(" 1 "));
     #endif
     Serial.print(F("@ "));
-    Serial.println(asctime(timeinfo));
+    Serial.println(getCurrentTime());
     wifiLED.on();
     garageDoorRelay.close();
     publishSystemState();
@@ -583,9 +625,8 @@ void activateDoor() {
 
 #ifdef CG_MODEL_2
 void activateDoor2() {
-    struct tm *timeinfo = getCurrentTime();
     Serial.print(F("INFO: Activating door 2 @ "));
-    Serial.println(asctime(timeinfo));
+    Serial.println(getCurrentTime());
     wifiLED.on();
     garageDoorRelay2.close();
     publishSystemState();
@@ -594,7 +635,7 @@ void activateDoor2() {
 #endif
 
 /**
- * Processes control requests. Executes the specified command
+ * @brief Processes control requests. Executes the specified command
  * if valid and intended for this client.
  * @param id The client ID the command is intended for.
  * @param cmd The command to execute.
@@ -650,7 +691,7 @@ void handleControlRequest(String id, ControlCommand cmd) {
 }
 
 /**
- * Callback method for handling incoming MQTT messages on the subscribed
+ * @brief Callback method for handling incoming MQTT messages on the subscribed
  * channel(s). This will decode the message and process incoming commands.
  * Commands are only executed if the command was intended for this device.
  * The system makes this determination by comaparing the ID in the JSON
@@ -661,9 +702,8 @@ void handleControlRequest(String id, ControlCommand cmd) {
  * @param length The payload (message) length.
  */
 void onMqttMessage(char* topic, byte* payload, unsigned int length) {
-    struct tm *timeinfo = getCurrentTime();
     Serial.print(F("INFO: [MQTT] ["));
-    Serial.print(asctime(timeinfo));
+    Serial.print(getCurrentTime());
     Serial.print(F("] Message arrived: ["));
     Serial.print(topic);
     Serial.print(F("] "));
@@ -697,7 +737,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 /**
- * Initializes the MDNS responder (if enabled).
+ * @brief Initializes the MDNS responder (if enabled).
  */
 void initMDNS() {
     #ifdef ENABLE_MDNS
@@ -722,7 +762,7 @@ void initMDNS() {
 }
 
 /**
- * Initialize the SPIFFS filesystem.
+ * @brief Initialize the SPIFFS filesystem.
  */
 void initFilesystem() {
     Serial.print(F("INIT: Initializing SPIFFS and mounting filesystem... "));
@@ -739,12 +779,13 @@ void initFilesystem() {
 }
 
 /**
- * Initializes the MQTT client.
+ * @brief Initializes the MQTT client.
  */
 void initMQTT() {
     Serial.print(F("INIT: Initializing MQTT client... "));
     mqttClient.setServer(config.mqttBroker.c_str(), config.mqttPort);
     mqttClient.setCallback(onMqttMessage);
+    mqttClient.setBufferSize(500);
     Serial.println(F("DONE"));
     if (reconnectMqttClient()) {
         delay(500);
@@ -753,7 +794,8 @@ void initMQTT() {
 }
 
 /**
- * Attempt to connect to the configured WiFi network. This will break any existing connection first.
+ * @brief Attempt to connect to the configured WiFi network. This will break any
+ * existing connection first.
  */
 void connectWifi() {
     Serial.println(F("DEBUG: Setting mode..."));
@@ -795,7 +837,7 @@ void connectWifi() {
 }
 
 /**
- * Enter fail-safe mode. This will suspend all tasks, disable relay activation,
+ * @brief Enter fail-safe mode. This will suspend all tasks, disable relay activation,
  * and propmpt the user for configuration.
  */
 void failSafe() {
@@ -815,7 +857,7 @@ void failSafe() {
 }
 
 /**
- * Initializes the WiFi network interface.
+ * @brief Initializes the WiFi network interface.
  */
 void initWiFi() {
     Serial.println(F("INIT: Initializing WiFi... "));
@@ -829,7 +871,7 @@ void initWiFi() {
 }
 
 /**
- * Initializes the OTA update listener if enabled.
+ * @brief Initializes the OTA update listener if enabled.
  */
 void initOTA() {
     #ifdef ENABLE_OTA
@@ -893,7 +935,7 @@ void initOTA() {
 }
 
 /**
- * Initializes the RS232 serial interface.
+ * @brief Initializes the RS232 serial interface.
  */
 void initSerial() {
     Serial.setDebugOutput(true);
@@ -907,7 +949,7 @@ void initSerial() {
 }
 
 /**
- * Initializes the required input pins.
+ * @brief Initializes the required input pins.
  */
 void initInputs() {
     Serial.print(F("INIT: Initializing sensors... "));
@@ -921,7 +963,7 @@ void initInputs() {
 }
 
 /**
- * Initializes output components.
+ * @brief Initializes output components.
  */
 void initOutputs() {
     Serial.print(F("INIT: Initializing components... "));
@@ -944,7 +986,7 @@ void initOutputs() {
 }
 
 /**
- * Initializes the task manager and all recurring tasks.
+ * @brief Initializes the task manager and all recurring tasks.
  */
 void initTaskManager() {
     Serial.print(F("INIT: Initializing task scheduler... "));
@@ -965,7 +1007,8 @@ void initTaskManager() {
 }
 
 /**
- * Callback routine for checking WiFi connectivity.
+ * @brief Callback routine for checking WiFi connectivity. If not connected,
+ * this will attempt a reconnect and if successful, will re-init MDNS and OTA.
  */
 void onCheckWiFi() {
     Serial.println(F("INFO: Checking WiFi connectivity..."));
@@ -980,7 +1023,7 @@ void onCheckWiFi() {
 }
 
 /**
- * Callback routine for checking if the door has been activated, and
+ * @brief Callback routine for checking if the door has been activated, and
  * deactivates it if it has.
  */
 void onCheckActivation() {
@@ -1004,7 +1047,7 @@ void onCheckActivation() {
 }
 
 /**
- * Callback routine that checks the sensor inputs to determine door state.
+ * @brief Callback routine that checks the sensor inputs to determine door state.
  */
 void onCheckSensors() {
     Serial.println(F("INFO: Checking sensor..."));
@@ -1041,12 +1084,17 @@ void onCheckSensors() {
     #endif
 }
 
+/**
+ * @brief Callback handler for when a door contact changes state.
+ * @param sender The door that changed state.
+ */
 void onDoorContactStateChange(DoorInfo* sender) {
     onCheckSensors();
 }
 
 /**
- * Initializes the crash monitor and dump any previous crash data to the serial console.
+ * @brief Initializes the crash monitor and dump any previous crash data to the
+ * serial console.
  */
 void initCrashMonitor() {
     Serial.print(F("INIT: Initializing crash monitor... "));
@@ -1056,6 +1104,9 @@ void initCrashMonitor() {
     delay(100);
 }
 
+/**
+ * @brief Callback handler for activating door 1 from the CLI.
+ */
 void onActivateDoor1() {
     activateDoor();
     delay(1000);
@@ -1063,6 +1114,10 @@ void onActivateDoor1() {
     Console.enterCommandInterpreter();
 }
 
+/**
+ * @brief (Only for Model 2 controllers) Callback handler for activating
+ * door 2 from the CLI.
+ */
 #ifdef CG_MODEL_2
 void onActivateDoor2() {
     activateDoor2();
@@ -1072,16 +1127,33 @@ void onActivateDoor2() {
 }
 #endif
 
+/**
+ * @brief Callback handler for performing a "factory restore" of the config
+ * from the CLI. This executes the "factory restore" procedure.
+ */
 void handleFactoryRestore() {
     doFactoryRestore();
-    reboot();
 }
 
+/**
+ * @brief Callback handler for changing the localhost hostname from the CLI.
+ * This will apply the new hostname to the running config and then re-init
+ * the MDNS resolver.
+ * @param newHostName The new hostname. 
+ */
 void onNewHostName(const char* newHostName) {
-    config.hostname = newHostName;
-    initMDNS();
+    if (config.hostname != newHostName) {
+        config.hostname = newHostName;
+        WiFi.setHostname(config.hostname.c_str());
+        initMDNS();
+    }
 }
 
+/**
+ * @brief Callback handler for switching to DHCP mode from the CLI. This
+ * will apply the DHCP flag to the running config and then force the WiFi
+ * interface to request configuration from DHCP.
+ */
 void onSwitchToDhcp() {
     if (config.useDhcp) {
         Serial.println(F("INFO: DHCP mode already set. Skipping..."));
@@ -1094,14 +1166,32 @@ void onSwitchToDhcp() {
     }
 }
 
+/**
+ * @brief Callback handler for switching to or updating the static IP settings.
+ * This will apply the new settings to the running config and then force the
+ * WiFi interface into static IP mode using those settings.
+ * @param newIp The new local IP address.
+ * @param newSm The new subnet mask.
+ * @param newGw The new gateway IP address.
+ * @param newDns The new DNS IP address.
+ */
 void onSwitchToStaticConfig(IPAddress newIp, IPAddress newSm, IPAddress newGw, IPAddress newDns) {
     config.ip = newIp;
     config.sm = newSm;
     config.gw = newGw;
     config.dns = newDns;
-    WiFi.config(config.ip, config.gw, config.sm, config.dns);  // If actual IP set, then disables DHCP and assumes static.
+
+    // If actual IP set, then disables DHCP and assumes static.
+    WiFi.config(config.ip, config.gw, config.sm, config.dns);
 }
 
+/**
+ * @brief Callback handler for reconnecting to WiFi from the CLI. This will
+ * execute a status check. If not connected, this will then attempt to
+ * reconnect. If successful, this will automatically resume normal operation
+ * and exit the CLI. If not successful, will report the error and remain in
+ * the CLI.
+ */
 void onReconnectFromConsole() {
     // Attempt to reconnect to WiFi.
     onCheckWiFi();
@@ -1115,33 +1205,57 @@ void onReconnectFromConsole() {
     }
 }
 
+/**
+ * @brief Callback handler for changing the WiFi settings from the CLI. This
+ * applies the new settings to the running config and then reconnects to WiFi.
+ * @param newSsid The new SSID.
+ * @param newPassword The new password.
+ */
 void onWifiConfig(String newSsid, String newPassword) {
-    config.ssid = newSsid;
-    config.password = newPassword;
-    connectWifi();
+    if (config.ssid != newSsid || config.password != newPassword) {
+        config.ssid = newSsid;
+        config.password = newPassword;
+        connectWifi();
+    }
 }
 
+/**
+ * @brief Callback handler for persisting the running config to flash.
+ */
 void onSaveConfig() {
     saveConfiguration();
     WiFi.disconnect(true);
     onCheckWiFi();
 }
 
+/**
+ * @brief Callback handler for when the user changes the MQTT settings from
+ * the CLI. This unsubscribes from any subscribed topics, disconnects from
+ * the current broker, then re-inits the MQTT client.
+ * @param newBroker The new MQTT broker.
+ * @param newPort The new MQTT port.
+ * @param newUsername The new username.
+ * @param newPass The new password.
+ * @param newConChan The new control topic.
+ * @param newStatChan The new status topic.
+ */
 void onMqttConfigCommand(String newBroker, int newPort, String newUsername, String newPass, String newConChan, String newStatChan) {
     mqttClient.unsubscribe(config.mqttTopicControl.c_str());
     mqttClient.disconnect();
+
     config.mqttBroker = newBroker;
     config.mqttPort = newPort;
     config.mqttUsername = newUsername;
     config.mqttPassword = newPass;
     config.mqttTopicControl = newConChan;
     config.mqttTopicStatus = newStatChan;
+
     initMQTT();
     Serial.println();
 }
 
 /**
- * Initialize the CLI.
+ * @brief Initialize the CLI.
  */
 void initConsole() {
     Serial.print(F("INIT: Initializing console... "));
@@ -1175,7 +1289,8 @@ void initConsole() {
 }
 
 /**
- * Bootstrap routine. Executes once at boot and initializes all subsystems in sequence.
+ * @brief Bootstrap routine. Executes once at boot and initializes all
+ * subsystems in sequence.
  */
 void setup() {
     // This boot sequence is important. DO NOT ALTER.
@@ -1196,7 +1311,7 @@ void setup() {
 }
 
 /**
- * Main loop. Executes all tasks that need to be, handles incoming web server requests,
+ * @brief Main loop. Executes all tasks that need to be, handles incoming web server requests,
  * and OTA update requests.
  */
 void loop() {

@@ -1,6 +1,6 @@
 # CyGarage
 
-[![Build Status](https://travis-ci.com/cyrusbuilt/CyGarage.svg?branch=master)](https://travis-ci.com/cyrusbuilt/CyGarage)
+![Build Status](https://github.com/cyrusbuilt/CyGarage/actions/workflows/ci.yml/badge.svg)
 
 Arduino-based (specifically the Adafruit Huzzah ESP8266) IoT garage door opener.
 
