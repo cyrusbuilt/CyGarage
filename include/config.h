@@ -18,6 +18,8 @@
 
 // Configuration
 //#define CG_MODEL_2                            // Comment this line to revert to Model 1 (single door) firmware.
+#define DEVICE_NAME "CYGARAGE"                  // The device name.
+#define DEVICE_CLASS "cygarage"                 // The device class (used for discovery).
 #define ENABLE_OTA                              // Comment this line to disable OTA updates.
 #define ENABLE_MDNS                             // Comment this line to disable the MDNS.
 #define CONFIG_FILE_PATH "/config.json"         // The config file path. Do not alter unless you are sure.
@@ -29,21 +31,21 @@
 #define CHECK_SENSORS_INTERVAL 3000             // How often to check sensors (milliseconds).
 #define CLOCK_SYNC_INTERVAL 3600000             // How often to sync the local clock with NTP (milliseconds).
 #define ACTIVATION_DURATION 2500                // How long the activation relay should be on.
-#define DEVICE_NAME "CYGARAGE"                  // The device name.
 #define CHECK_MQTT_INTERVAL 35000               // MQTT connectivity check interval (milliseconds).
-#define MQTT_TOPIC_STATUS "cygarage/status"     // MQTT status channel to publish to.
-#define MQTT_TOPIC_CONTROL "cygarage/control"   // MQTT control channel to subscribe to.
+#define MQTT_TOPIC_STATUS "cygarage/status"     // MQTT status topic to publish to.
+#define MQTT_TOPIC_CONTROL "cygarage/control"   // MQTT control topic to subscribe to.
+#define MQTT_TOPIC_DISCOVERY "redqueen/config"  // MQTT discovery topic to publish to.
 #define MQTT_BROKER "your_mqtt_broker_IP"       // MQTT broker hostname or IP.
 #define MQTT_PORT 8883                          // MQTT port number.
 #ifdef ENABLE_OTA
     #include <ArduinoOTA.h>
-    #define OTA_HOST_PORT 8266                     // The OTA updater port.
-    #define OTA_PASSWORD "your_OTA_password_here"  // The OTA updater password.
+    #define OTA_HOST_PORT 8266                         // The OTA updater port.
+    #define OTA_PASSWORD "your_OTA_password_here"      // The OTA updater password.
 #endif
 IPAddress defaultIp(192, 168, 0, 200);                 // The default static host IP.
 IPAddress defaultGw(192, 168, 0, 1);                   // The default static gateway IP.
 IPAddress defaultSm(255, 255, 255, 0);                 // The default static subnet mask.
-IPAddress defaultDns(defaultGw);                              // The default static DNS server IP (same as gateway for most residential setups)
+IPAddress defaultDns(defaultGw);                       // The default static DNS server IP (same as gateway for most residential setups)
 
 typedef struct {
     // Network stuff
@@ -61,6 +63,7 @@ typedef struct {
     // MQTT stuff
     String mqttTopicStatus;
     String mqttTopicControl;
+    String mqttTopicDiscovery;
     String mqttBroker;
     String mqttUsername;
     String mqttPassword;
